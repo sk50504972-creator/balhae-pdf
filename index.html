@@ -1459,6 +1459,8 @@ addEventListener('beforeunload', e => { if (S.dirty) { e.preventDefault(); e.ret
 const GCLIENT = '504587891767-m7vadrumbdpo7uv167q3kgu39484euvn.apps.googleusercontent.com';
 const GSCOPES = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.install';
 let gisP = null, gToken = null, gExp = 0;
+function saveTok(t, exp) { gToken = t; gExp = exp; try { localStorage.setItem('balhae-gtok', JSON.stringify({ t, exp })); } catch {} }
+try { const j = JSON.parse(localStorage.getItem('balhae-gtok') || 'null'); if (j && j.exp > Date.now() + 60000) { gToken = j.t; gExp = j.exp; } } catch {}
 function loadGis() {
   return gisP || (gisP = new Promise((res, rej) => {
     if (window.google?.accounts?.oauth2) return res();
@@ -1473,7 +1475,7 @@ async function getToken(hint, consent) {
   return new Promise((res, rej) => {
     const tc = google.accounts.oauth2.initTokenClient({
       client_id: GCLIENT, scope: GSCOPES, ...(hint ? { login_hint: hint } : {}),
-      callback: r => { if (r.error) return rej(new Error(r.error_description || r.error)); gToken = r.access_token; gExp = Date.now() + (r.expires_in || 3600) * 1000; res(gToken); },
+      callback: r => { if (r.error) return rej(new Error(r.error_description || r.error)); saveTok(r.access_token, Date.now() + (r.expires_in || 3600) * 1000); res(gToken); },
       error_callback: e => rej(new Error(e.type === 'popup_closed' ? '로그인 창이 닫혔습니다' : e.type === 'popup_failed_to_open' ? '팝업이 막혔습니다. 주소창에서 팝업을 허용해 주세요' : (e.message || e.type))),
     });
     tc.requestAccessToken({ prompt: consent ? 'consent' : '' });
@@ -1539,21 +1541,55 @@ async function saveToDrive() {
   finally { busy(false); }
 }
 $('#bDriveSave').onclick = saveToDrive;
-// opened from Drive "연결 앱"
-(() => {
-  const st = new URLSearchParams(location.search).get('state'); if (!st) return;
-  let s; try { s = JSON.parse(st); } catch { return; }
-  history.replaceState(null, '', location.pathname);
-  if (s.action !== 'open') return;
-  if (!s.ids || !s.ids.length) { toast('구글 문서·시트 파일은 열 수 없습니다. PDF나 사진을 고르세요.', 5000); return; }
+// opened from Drive "연결 앱": 버튼 없이 바로 연다 (이미 허용한 계정이면 구글이 즉시 돌려보냄)
+const REDIRECT_URI = location.origin + '/balhae-pdf/';
+function redirectAuth(hint, silent) {
+  const p = new URLSearchParams({ client_id: GCLIENT, redirect_uri: REDIRECT_URI, response_type: 'token', scope: GSCOPES, include_granted_scopes: 'true', state: 'balhae-drive' });
+  if (hint) p.set('login_hint', hint);
+  if (silent) p.set('prompt', 'none');
+  location.replace('https://accounts.google.com/o/oauth2/v2/auth?' + p.toString());
+}
+function showDriveGate(pend, msg) {
+  busy(false);
   loadGis().catch(() => {});
-  $('#driveGateMsg').textContent = `드라이브에서 고른 파일 ${s.ids.length}개를 엽니다. 아래 버튼을 누르고 구글 계정을 확인해 주세요.`;
+  $('#driveGateMsg').textContent = msg || `드라이브에서 고른 파일 ${pend.ids.length}개를 엽니다. 아래 버튼을 누르고 구글 계정을 확인해 주세요.`;
   $('#driveGate').hidden = false;
   $('#bDriveOpen').onclick = async () => {
     $('#driveGate').hidden = true;
-    try { await openDriveIds(s.ids, s.resourceKeys, s.userId); }
-    catch (e) { $('#driveGateMsg').textContent = '열지 못했습니다: ' + e.message; $('#driveGate').hidden = false; }
+    try { await openDriveIds(pend.ids, pend.resourceKeys, pend.userId); sessionStorage.removeItem('balhae-drive-open'); }
+    catch (e) { showDriveGate(pend, '열지 못했습니다: ' + e.message); }
   };
+}
+(() => {
+  if (EMBED || location.protocol !== 'https:') return;
+  const sp = new URLSearchParams(location.search), hp = new URLSearchParams(location.hash.slice(1));
+  const st = sp.get('state');
+  if (st) {
+    let s = null; try { s = JSON.parse(st); } catch {}
+    history.replaceState(null, '', location.pathname);
+    if (s && s.action === 'open') { sessionStorage.setItem('balhae-drive-open', JSON.stringify(s)); sessionStorage.removeItem('balhae-drive-tried'); }
+  }
+  let pend = null; try { pend = JSON.parse(sessionStorage.getItem('balhae-drive-open') || 'null'); } catch {}
+  if (hp.get('state') === 'balhae-drive') {
+    history.replaceState(null, '', location.pathname);
+    const tok = hp.get('access_token');
+    if (tok) saveTok(tok, Date.now() + (parseInt(hp.get('expires_in'), 10) || 3600) * 1000);
+    const err = hp.get('error');
+    if (err && pend) {
+      if (err !== 'access_denied' && !sessionStorage.getItem('balhae-drive-tried')) { sessionStorage.setItem('balhae-drive-tried', '1'); redirectAuth(pend.userId, false); return; }
+      showDriveGate(pend, err === 'access_denied' ? '구글 계정 허용이 취소되었습니다. 다시 하려면 아래 버튼을 누르세요.' : '구글 계정 확인이 필요합니다. 아래 버튼을 누르세요.');
+      return;
+    }
+  }
+  if (!pend) return;
+  if (!pend.ids || !pend.ids.length) { sessionStorage.removeItem('balhae-drive-open'); toast('구글 문서·시트 파일은 열 수 없습니다. PDF나 사진을 고르세요.', 5000); return; }
+  if (gToken && Date.now() < gExp - 60000) {
+    sessionStorage.removeItem('balhae-drive-open'); sessionStorage.removeItem('balhae-drive-tried');
+    openDriveIds(pend.ids, pend.resourceKeys, pend.userId).catch(e => showDriveGate(pend, '열지 못했습니다: ' + e.message));
+    return;
+  }
+  busy(true, '구글 드라이브 파일을 여는 중...');
+  redirectAuth(pend.userId, true);
 })();
 
 // ---------- 연결 설정 (드라이브 등록 / PC 앱 설치) ----------
@@ -1611,7 +1647,7 @@ if ('launchQueue' in window) {
 if (!EMBED && location.protocol === 'https:' && 'serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(e => console.warn(e));
 
 // ---------- 업데이트 ----------
-const APP_VERSION = '2026.10.13-1642';
+const APP_VERSION = '2026.10.13-1705';
 $('#stVer').textContent = 'v' + APP_VERSION + ' · 업데이트 확인';
 $('#verNow').textContent = 'v' + APP_VERSION;
 let lastUpdCheck = 0, updDismissed = '';
