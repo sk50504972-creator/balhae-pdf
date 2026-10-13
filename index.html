@@ -115,6 +115,11 @@ dialog .btns{display:flex;justify-content:flex-end;gap:6px;margin-top:16px}
 #dlgLink .msg{display:block;margin-top:6px;color:#2f4a75;font-size:12px}
 #defBar{position:fixed;left:50%;top:96px;transform:translateX(-50%);background:#fff;border:1px solid #8fb2ee;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.18);padding:10px 14px;display:flex;align-items:center;gap:8px;z-index:48;max-width:94vw}
 #defBar[hidden]{display:none}
+#updBar{position:fixed;right:18px;bottom:40px;background:#fff;border:1px solid #8fb2ee;border-left:5px solid var(--accent);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.18);padding:10px 14px;display:flex;align-items:center;gap:8px;z-index:48;max-width:min(560px,94vw)}
+#updBar[hidden]{display:none}
+#stVer{margin-left:auto;cursor:pointer;color:#5b6679;text-decoration:underline dotted}
+#stVer:hover{color:var(--accent)}
+footer #hint{margin-left:12px}
 #q{width:170px}
 </style>
 </head>
@@ -198,7 +203,7 @@ dialog .btns{display:flex;justify-content:flex-end;gap:6px;margin-top:16px}
     <div id="spList"></div>
   </aside>
 </main>
-<footer><span id="stPages">문서 없음</span><span id="stSel"></span><span id="stFiles"></span><span id="stDirty" style="color:#c0392b"></span><span id="hint"></span></footer>
+<footer><span id="stPages">문서 없음</span><span id="stSel"></span><span id="stFiles"></span><span id="stDirty" style="color:#c0392b"></span><span id="stVer" title="누르면 업데이트 확인"></span><span id="hint"></span></footer>
 
 <input id="fOpen" type="file" multiple accept=".pdf,application/pdf,image/*" hidden>
 <input id="fAdd" type="file" multiple accept=".pdf,application/pdf,image/*" hidden>
@@ -262,9 +267,16 @@ dialog .btns{display:flex;justify-content:flex-end;gap:6px;margin-top:16px}
       더 간단한 방법: 탐색기에서 아무 PDF나 오른쪽 클릭 → 연결 프로그램 → 다른 앱 선택 → <b>발해 PDF 편집기</b> → [항상].<br>
       목록에 발해 PDF 편집기가 없으면 2번 설치를 먼저 하세요. 되돌리려면 같은 방법으로 다른 앱을 고르면 됩니다.</p>
     </div>
+    <div class="sec">
+      <b>4. 업데이트</b>
+      <p>지금 버전: <b id="verNow"></b>. 인터넷에 연결돼 있으면 열 때마다, 그리고 30분마다 새 버전을 확인해 알려 드립니다.</p>
+      <button type="button" id="bUpdCheck" class="primary">지금 업데이트 확인</button>
+      <span id="updMsg" class="msg"></span>
+    </div>
     <div class="btns"><button value="close" type="submit">닫기</button></div>
   </form>
 </dialog>
+<div id="updBar" hidden><span id="updText"></span><button id="bUpdGo" class="primary">지금 업데이트</button><button id="bUpdLater">나중에</button></div>
 <div id="defBar" hidden><span>이 PC에서 PDF를 더블클릭하면 항상 <b>발해 PDF 편집기</b>로 열리게 할까요?</span><button id="bDefBarGo" class="primary">기본 앱으로 지정</button><button id="bDefBarNo">다음에</button><button id="bDefBarNever">다시 묻지 않기</button></div>
 <div id="driveGate" hidden><div class="card">
   <h3>구글 드라이브 파일 열기</h3>
@@ -1568,6 +1580,47 @@ if ('launchQueue' in window) {
   });
 }
 if (location.protocol === 'https:' && 'serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(e => console.warn(e));
+
+// ---------- 업데이트 ----------
+const APP_VERSION = '2026.10.13-1609';
+$('#stVer').textContent = 'v' + APP_VERSION + ' · 업데이트 확인';
+$('#verNow').textContent = 'v' + APP_VERSION;
+let lastUpdCheck = 0, updDismissed = '';
+async function checkUpdate(manual) {
+  const msg = t => { $('#updMsg').textContent = t; if (manual) toast(t, 4000); };
+  if (location.protocol !== 'https:') { if (manual) msg('파일로 연 편집기는 자동 업데이트가 없습니다. https://balhae.claimworks.kr/balhae-pdf/ 로 여세요.'); return; }
+  lastUpdCheck = Date.now();
+  try {
+    const j = await (await fetch('version.json?t=' + Date.now(), { cache: 'no-store' })).json();
+    if (j.version && j.version > APP_VERSION) {
+      if (manual || updDismissed !== j.version) {
+        $('#updText').textContent = `새 버전 v${j.version}이 있습니다.` + (j.notes ? ` (${j.notes})` : '');
+        $('#updBar').hidden = false;
+        $('#updMsg').textContent = `새 버전 v${j.version}이 있습니다. [지금 업데이트]를 누르세요.`;
+        $('#updBar').dataset.ver = j.version;
+      }
+    } else if (manual) msg(`최신 버전을 쓰고 있습니다 (v${APP_VERSION})`);
+  } catch { if (manual) msg('업데이트를 확인하지 못했습니다 (인터넷 연결 확인)'); }
+}
+async function applyUpdate() {
+  if (document.activeElement && document.activeElement.isContentEditable) document.activeElement.blur();
+  if (S.dirty && !confirm('저장하지 않은 변경이 있습니다.\n업데이트하면 편집기가 다시 열리면서 지금 변경이 사라집니다.\n\n[확인] 그래도 업데이트   [취소] 먼저 저장하기')) return;
+  S.dirty = false;
+  busy(true, '최신 버전으로 업데이트하는 중...');
+  try { const reg = await navigator.serviceWorker?.getRegistration(); if (reg) await reg.update(); } catch {}
+  try { for (const k of await caches.keys()) await caches.delete(k); } catch {}
+  try { await fetch(location.pathname, { cache: 'reload' }); } catch {}
+  location.replace(location.pathname + location.hash);
+}
+$('#bUpdGo').onclick = applyUpdate;
+$('#bUpdLater').onclick = () => { updDismissed = $('#updBar').dataset.ver || ''; $('#updBar').hidden = true; };
+$('#bUpdCheck').onclick = () => checkUpdate(true);
+$('#stVer').onclick = () => checkUpdate(true);
+if (location.protocol === 'https:') {
+  setTimeout(() => checkUpdate(false), 4000);
+  setInterval(() => checkUpdate(false), 30 * 60 * 1000);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && Date.now() - lastUpdCheck > 10 * 60 * 1000) checkUpdate(false); });
+}
 
 setTool('select'); updateStatus();
 window.__balhaePdf = { S, buildPdf, importFiles };
