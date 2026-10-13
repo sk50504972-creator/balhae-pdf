@@ -120,6 +120,7 @@ dialog .btns{display:flex;justify-content:flex-end;gap:6px;margin-top:16px}
     <span class="brand">발해 PDF 편집기</span>
     <div class="grp">
       <button id="bOpen" title="새로 열기 (Ctrl+O)">열기</button>
+      <button id="bClose" title="지금 열려 있는 문서 닫기">닫기</button>
       <button id="bAdd" title="현재 쪽 뒤에 PDF·사진을 끼워 넣기 (합치기)">파일 추가·합치기</button>
       <button id="bSave" class="primary" title="저장 (Ctrl+S)">저장</button>
       <button id="bSaveSel" title="왼쪽에서 선택한 쪽만 새 PDF로 저장">선택 쪽만 저장</button>
@@ -1021,12 +1022,22 @@ $('#bOpen').onclick = () => {
   if (S.pages.length && S.dirty && !confirm('저장하지 않은 변경이 있습니다. 지금 문서를 닫고 새로 열까요?')) return;
   $('#fOpen').click();
 };
-$('#fOpen').onchange = async e => {
-  const files = e.target.files; if (!files.length) return;
-  S.pages = []; S.selected = new Set(); S.undo = []; S.redo = []; S.sel = null; S.hits = {}; S.currentId = null;
+function resetDoc() {
+  if (document.activeElement && document.activeElement.isContentEditable) document.activeElement.blur();
+  S.pages = []; S.selected = new Set(); S.undo = []; S.redo = []; S.sel = null; S.hits = {}; S.currentId = null; S.dirty = false;
   mainCache.clear(); thumbCache.clear(); textCache.clear();
   for (const s of S.sources.values()) try { s.pdf.destroy(); } catch {}
-  S.sources.clear(); $('#sp').hidden = true;
+  S.sources.clear(); $('#sp').hidden = true; $('#q').value = '';
+  refresh();
+}
+$('#bClose').onclick = () => {
+  if (!S.pages.length) return toast('열려 있는 문서가 없습니다');
+  if (S.dirty && !confirm('저장하지 않은 변경이 있습니다. 저장하지 않고 닫을까요?')) return;
+  resetDoc(); toast('문서를 닫았습니다');
+};
+$('#fOpen').onchange = async e => {
+  const files = e.target.files; if (!files.length) return;
+  resetDoc();
   await importFiles(files, 0); e.target.value = '';
 };
 $('#bAdd').onclick = () => $('#fAdd').click();
