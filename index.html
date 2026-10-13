@@ -111,6 +111,8 @@ dialog .btns{display:flex;justify-content:flex-end;gap:6px;margin-top:16px}
 #dlgLink .sec p{margin:6px 0}
 #dlgLink .small{font-size:12px;color:#5b6679}
 #dlgLink .msg{display:block;margin-top:6px;color:#2f4a75;font-size:12px}
+#defBar{position:fixed;left:50%;top:96px;transform:translateX(-50%);background:#fff;border:1px solid #8fb2ee;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.18);padding:10px 14px;display:flex;align-items:center;gap:8px;z-index:48;max-width:94vw}
+#defBar[hidden]{display:none}
 #q{width:170px}
 </style>
 </head>
@@ -245,9 +247,19 @@ dialog .btns{display:flex;justify-content:flex-end;gap:6px;margin-top:16px}
       <span id="pwaMsg" class="msg"></span>
       <p class="small">처음 열 때 "파일 열기 허용" 창이 뜨면 [허용]을 누르세요. PDF를 더블클릭하면 항상 이 앱으로 열리게 하려면: PDF 오른쪽 클릭 → 연결 프로그램 → 다른 앱 선택 → 발해 PDF 편집기 → [항상].</p>
     </div>
+    <div class="sec">
+      <b>3. PDF 기본 앱으로 지정</b>
+      <p>2번(PC 앱 설치)을 한 뒤, PDF를 <b>더블클릭하면 항상</b> 발해 PDF 편집기로 열리게 합니다.</p>
+      <button type="button" id="bDefaultApp" class="primary">윈도우 기본 앱 설정 열기</button>
+      <span id="defMsg" class="msg"></span>
+      <p class="small">설정 창에서: 위쪽 「파일 형식 또는 링크 형식에 대한 기본값 설정」 칸에 <b>.pdf</b> 입력 → 아래에 나오는 지금 앱(예: Adobe Acrobat, Microsoft Edge)을 클릭 → <b>발해 PDF 편집기</b> 선택 → [기본값 설정].<br>
+      더 간단한 방법: 탐색기에서 아무 PDF나 오른쪽 클릭 → 연결 프로그램 → 다른 앱 선택 → <b>발해 PDF 편집기</b> → [항상].<br>
+      목록에 발해 PDF 편집기가 없으면 2번 설치를 먼저 하세요. 되돌리려면 같은 방법으로 다른 앱을 고르면 됩니다.</p>
+    </div>
     <div class="btns"><button value="close" type="submit">닫기</button></div>
   </form>
 </dialog>
+<div id="defBar" hidden><span>이 PC에서 PDF를 더블클릭하면 항상 <b>발해 PDF 편집기</b>로 열리게 할까요?</span><button id="bDefBarGo" class="primary">기본 앱으로 지정</button><button id="bDefBarNo">다음에</button><button id="bDefBarNever">다시 묻지 않기</button></div>
 <div id="driveGate" hidden><div class="card">
   <h3>구글 드라이브 파일 열기</h3>
   <div id="driveGateMsg"></div>
@@ -1454,7 +1466,7 @@ $('#bDriveSave').onclick = saveToDrive;
 // ---------- 연결 설정 (드라이브 등록 / PC 앱 설치) ----------
 let deferredInstall = null;
 addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferredInstall = e; });
-addEventListener('appinstalled', () => { $('#pwaMsg').textContent = '설치했습니다. 이제 탐색기에서 PDF 오른쪽 클릭 → 연결 프로그램에 나타납니다.'; });
+addEventListener('appinstalled', () => { $('#pwaMsg').textContent = '설치했습니다. 이제 아래 3번 [윈도우 기본 앱 설정 열기]로 기본 앱을 지정하세요.'; });
 $('#bLink').onclick = () => {
   if (location.protocol !== 'https:') { alert('연결 설정은 인터넷 주소(https://balhae.claimworks.kr/balhae-pdf/)로 연 편집기에서만 할 수 있습니다.'); return; }
   loadGis().catch(() => {});
@@ -1466,6 +1478,23 @@ $('#bDriveInstall').onclick = async () => {
   try { await getToken(undefined, true); m.textContent = '등록했습니다. 드라이브에서 PDF 오른쪽 클릭 → 연결 앱에 나타납니다 (반영까지 몇 분 걸릴 수 있음).'; }
   catch (e) { m.textContent = '등록하지 못했습니다: ' + e.message; }
 };
+const DEF_KEY = 'balhae-pdf-default-asked';
+function openDefaultAppsSettings(msgEl) {
+  try { localStorage.setItem(DEF_KEY, 'opened'); } catch {}
+  if (msgEl) msgEl.textContent = '윈도우 설정을 엽니다. 브라우저가 "설정을 여시겠습니까?"라고 물으면 [열기]를 누르세요. 그다음 .pdf 검색 → 발해 PDF 편집기 선택.';
+  location.href = 'ms-settings:defaultapps';
+}
+$('#bDefaultApp').onclick = () => openDefaultAppsSettings($('#defMsg'));
+$('#bDefBarGo').onclick = () => { $('#defBar').hidden = true; $('#dlgLink').showModal(); openDefaultAppsSettings($('#defMsg')); };
+$('#bDefBarNo').onclick = () => { $('#defBar').hidden = true; };
+$('#bDefBarNever').onclick = () => { $('#defBar').hidden = true; try { localStorage.setItem(DEF_KEY, 'never'); } catch {} };
+// 설치한 PC 앱으로 처음 실행하면 기본 앱 지정을 한 번 권한다
+if (matchMedia('(display-mode: standalone)').matches) {
+  let asked = null; try { asked = localStorage.getItem(DEF_KEY); } catch {}
+  if (!asked) setTimeout(() => { $('#defBar').hidden = false; }, 1200);
+}
+// 주소 끝에 #설치 또는 #install 이 붙어 있으면 연결 설정 창을 바로 연다
+if (location.protocol === 'https:' && /^#(install|setup|%EC%84%A4%EC%B9%98)$/i.test(location.hash)) setTimeout(() => $('#bLink').click(), 800);
 $('#bPwaInstall').onclick = async () => {
   const m = $('#pwaMsg');
   if (matchMedia('(display-mode: standalone)').matches) { m.textContent = '이미 PC 앱으로 설치되어 있습니다.'; return; }
