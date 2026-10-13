@@ -1589,9 +1589,9 @@ function showDriveGate(pend, msg) {
     openDriveIds(pend.ids, pend.resourceKeys, pend.userId).catch(e => showDriveGate(pend, '열지 못했습니다: ' + e.message));
     return;
   }
-  if (!DRIVE_REDIRECT) { showDriveGate(pend); return; }
   busy(true, '구글 드라이브 파일을 여는 중...');
-  redirectAuth(pend.userId, true);
+  fetch('drive-mode.json?t=' + Date.now(), { cache: 'no-store' }).then(r => r.json()).catch(() => ({}))
+    .then(m => { if (DRIVE_REDIRECT && m.redirect === true) redirectAuth(pend.userId, true); else showDriveGate(pend); });
 })();
 
 // ---------- 연결 설정 (드라이브 등록 / PC 앱 설치) ----------
@@ -1649,7 +1649,7 @@ if ('launchQueue' in window) {
 if (!EMBED && location.protocol === 'https:' && 'serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(e => console.warn(e));
 
 // ---------- 업데이트 ----------
-const APP_VERSION = '2026.10.13-1718';
+const APP_VERSION = '2026.10.13-1720';
 $('#stVer').textContent = 'v' + APP_VERSION + ' · 업데이트 확인';
 $('#verNow').textContent = 'v' + APP_VERSION;
 let lastUpdCheck = 0, updDismissed = '';
