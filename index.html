@@ -1543,7 +1543,7 @@ async function saveToDrive() {
 $('#bDriveSave').onclick = saveToDrive;
 // opened from Drive "연결 앱": 버튼 없이 바로 연다 (이미 허용한 계정이면 구글이 즉시 돌려보냄)
 const REDIRECT_URI = location.origin + '/balhae-pdf/';
-const DRIVE_REDIRECT = false;
+const DRIVE_REDIRECT = true;
 function redirectAuth(hint, silent) {
   const p = new URLSearchParams({ client_id: GCLIENT, redirect_uri: REDIRECT_URI, response_type: 'token', scope: GSCOPES, include_granted_scopes: 'true', state: 'balhae-drive' });
   if (hint) p.set('login_hint', hint);
@@ -1649,7 +1649,7 @@ if ('launchQueue' in window) {
 if (!EMBED && location.protocol === 'https:' && 'serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(e => console.warn(e));
 
 // ---------- 업데이트 ----------
-const APP_VERSION = '2026.10.13-1706';
+const APP_VERSION = '2026.10.13-1718';
 $('#stVer').textContent = 'v' + APP_VERSION + ' · 업데이트 확인';
 $('#verNow').textContent = 'v' + APP_VERSION;
 let lastUpdCheck = 0, updDismissed = '';
