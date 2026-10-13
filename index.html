@@ -5,6 +5,9 @@
 <meta name="robots" content="noindex,nofollow">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>발해 PDF 편집기</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#1f3a5f">
+<link rel="icon" type="image/png" href="icons/icon-32.png">
 <style>
 :root{--brand:#1f3a5f;--line:#d7dce3;--bg:#e6eaf0;--accent:#2f6fde}
 *{box-sizing:border-box}
@@ -98,6 +101,16 @@ dialog h3{margin:0 0 12px;color:var(--brand)}
 dialog label{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:8px 0}
 dialog .btns{display:flex;justify-content:flex-end;gap:6px;margin-top:16px}
 #pageNo{width:52px;text-align:center}
+#driveGate{position:fixed;inset:0;background:rgba(20,30,45,.4);display:flex;align-items:center;justify-content:center;z-index:55}
+#driveGate[hidden]{display:none}
+#driveGate .card{background:#fff;border-radius:12px;padding:24px 28px;box-shadow:0 12px 40px rgba(0,0,0,.25);text-align:center;max-width:420px;line-height:1.6}
+#driveGate h3{margin:0 0 8px;color:var(--brand)}
+#driveGate button{margin-top:12px;font-size:15px;padding:8px 18px}
+#dlgLink{max-width:520px;line-height:1.6}
+#dlgLink .sec{border:1px solid #e3e7ed;border-radius:10px;padding:12px 14px;margin:10px 0}
+#dlgLink .sec p{margin:6px 0}
+#dlgLink .small{font-size:12px;color:#5b6679}
+#dlgLink .msg{display:block;margin-top:6px;color:#2f4a75;font-size:12px}
 #q{width:170px}
 </style>
 </head>
@@ -111,6 +124,7 @@ dialog .btns{display:flex;justify-content:flex-end;gap:6px;margin-top:16px}
       <button id="bSave" class="primary" title="저장 (Ctrl+S)">저장</button>
       <button id="bSaveSel" title="왼쪽에서 선택한 쪽만 새 PDF로 저장">선택 쪽만 저장</button>
       <button id="bPrint" title="인쇄용으로 열기">인쇄</button>
+      <button id="bDriveSave" hidden title="원본이 있던 구글 드라이브 폴더에 새 파일로 저장 (원본은 그대로)">드라이브에 저장</button>
     </div>
     <div class="grp">
       <button id="bUndo" title="실행 취소 (Ctrl+Z)">↶ 취소</button>
@@ -152,6 +166,7 @@ dialog .btns{display:flex;justify-content:flex-end;gap:6px;margin-top:16px}
       <button id="bDelObj" title="선택한 개체 삭제 (Delete)">개체 삭제</button>
     </div>
     <div class="spacer"></div>
+    <button id="bLink" title="구글 드라이브·윈도우 탐색기에서 바로 열기 설정">연결 설정</button>
     <input id="q" type="search" placeholder="문서 내 글자 검색 (Ctrl+F)">
   </div>
 </header>
@@ -213,6 +228,30 @@ dialog .btns{display:flex;justify-content:flex-end;gap:6px;margin-top:16px}
   </form>
 </dialog>
 
+<dialog id="dlgLink">
+  <form method="dialog">
+    <h3>바로 열기 연결 설정</h3>
+    <div class="sec">
+      <b>1. 구글 드라이브</b>
+      <p>등록하면 드라이브에서 PDF를 오른쪽 클릭 → <b>연결 앱 → 발해 PDF 편집기</b>로 바로 열립니다. 계정마다 한 번만 하면 됩니다.</p>
+      <button type="button" id="bDriveInstall" class="primary">구글 드라이브에 등록</button>
+      <span id="driveInstallMsg" class="msg"></span>
+    </div>
+    <div class="sec">
+      <b>2. 윈도우 탐색기</b>
+      <p>이 편집기를 PC 앱으로 설치하면 PDF를 오른쪽 클릭 → <b>연결 프로그램 → 발해 PDF 편집기</b>로 열 수 있습니다.</p>
+      <button type="button" id="bPwaInstall" class="primary">PC 앱으로 설치</button>
+      <span id="pwaMsg" class="msg"></span>
+      <p class="small">처음 열 때 "파일 열기 허용" 창이 뜨면 [허용]을 누르세요. PDF를 더블클릭하면 항상 이 앱으로 열리게 하려면: PDF 오른쪽 클릭 → 연결 프로그램 → 다른 앱 선택 → 발해 PDF 편집기 → [항상].</p>
+    </div>
+    <div class="btns"><button value="close" type="submit">닫기</button></div>
+  </form>
+</dialog>
+<div id="driveGate" hidden><div class="card">
+  <h3>구글 드라이브 파일 열기</h3>
+  <div id="driveGateMsg"></div>
+  <button id="bDriveOpen" class="primary">드라이브 파일 열기</button>
+</div></div>
 <div id="busy" hidden><div class="box"><div class="spin"></div><span id="busyText">처리 중...</span></div></div>
 <div id="toast"></div>
 
@@ -359,6 +398,8 @@ function updateStatus() {
   $('#pageNo').value = n ? curIndex() + 1 : 0;
   $('#empty').hidden = n > 0;
   $('#zoomVal').textContent = Math.round(S.zoom * 100) + '%';
+  const used = new Set(S.pages.map(p => p.src));
+  $('#bDriveSave').hidden = ![...S.sources.values()].some(s => s.drive && used.has(s.id));
 }
 
 // ---------- undo ----------
@@ -416,8 +457,9 @@ async function importFiles(fileList, insertAt) {
     try {
       const head = new Uint8Array(await f.slice(0, 1024).arrayBuffer());
       const isPdf = /\.pdf$/i.test(f.name) || f.type === 'application/pdf' || String.fromCharCode(...head).includes('%PDF');
-      if (isPdf) newPages.push(...await addPdfSource(f.name, new Uint8Array(await f.arrayBuffer())));
-      else if (f.type.startsWith('image/') || /\.(jpe?g|png|gif|bmp|webp)$/i.test(f.name)) newPages.push(...await addPdfSource(f.name, await imageToPdfBytes(f)));
+      const ex = {}; if (f._drive) ex.drive = f._drive; if (f._handle) ex.handle = f._handle;
+      if (isPdf) newPages.push(...await addPdfSource(f.name, new Uint8Array(await f.arrayBuffer()), ex));
+      else if (f.type.startsWith('image/') || /\.(jpe?g|png|gif|bmp|webp)$/i.test(f.name)) newPages.push(...await addPdfSource(f.name, await imageToPdfBytes(f), ex));
       else toast(`${f.name}: 지원하지 않는 형식입니다 (PDF·JPG·PNG만 가능)`, 4000);
     } catch (e) {
       console.error(e);
@@ -1236,7 +1278,8 @@ async function savePdf(mode) {
   const name = suggestName(mode);
   let handle = null;
   if (window.showSaveFilePicker) {
-    try { handle = await showSaveFilePicker({ suggestedName: name, types: [{ description: 'PDF 문서', accept: { 'application/pdf': ['.pdf'] } }] }); }
+    const startIn = S.pages.map(p => S.sources.get(p.src)).find(s => s.handle)?.handle;
+    try { handle = await showSaveFilePicker({ suggestedName: name, ...(startIn ? { startIn } : {}), types: [{ description: 'PDF 문서', accept: { 'application/pdf': ['.pdf'] } }] }); }
     catch (e) { if (e.name === 'AbortError') return; handle = null; }
   }
   const raster = askRaster(list);
@@ -1295,6 +1338,139 @@ document.addEventListener('keydown', e => {
   }
 });
 addEventListener('beforeunload', e => { if (S.dirty) { e.preventDefault(); e.returnValue = ''; } });
+
+// ---------- Google Drive (연결 앱) ----------
+const GCLIENT = '504587891767-m7vadrumbdpo7uv167q3kgu39484euvn.apps.googleusercontent.com';
+const GSCOPES = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.install';
+let gisP = null, gToken = null, gExp = 0;
+function loadGis() {
+  return gisP || (gisP = new Promise((res, rej) => {
+    if (window.google?.accounts?.oauth2) return res();
+    const s = document.createElement('script'); s.src = 'https://accounts.google.com/gsi/client'; s.async = true;
+    s.onload = () => res(); s.onerror = () => { gisP = null; rej(new Error('구글 로그인 모듈을 불러오지 못했습니다 (인터넷 연결 확인)')); };
+    document.head.appendChild(s);
+  }));
+}
+async function getToken(hint, consent) {
+  if (gToken && Date.now() < gExp - 60000 && !consent) return gToken;
+  await loadGis();
+  return new Promise((res, rej) => {
+    const tc = google.accounts.oauth2.initTokenClient({
+      client_id: GCLIENT, scope: GSCOPES, ...(hint ? { login_hint: hint } : {}),
+      callback: r => { if (r.error) return rej(new Error(r.error_description || r.error)); gToken = r.access_token; gExp = Date.now() + (r.expires_in || 3600) * 1000; res(gToken); },
+      error_callback: e => rej(new Error(e.type === 'popup_closed' ? '로그인 창이 닫혔습니다' : e.type === 'popup_failed_to_open' ? '팝업이 막혔습니다. 주소창에서 팝업을 허용해 주세요' : (e.message || e.type))),
+    });
+    tc.requestAccessToken({ prompt: consent ? 'consent' : '' });
+  });
+}
+async function dfetch(url, opt = {}, rk) {
+  const headers = { Authorization: 'Bearer ' + gToken, ...(opt.headers || {}) };
+  if (rk) headers['X-Goog-Drive-Resource-Keys'] = rk;
+  const r = await fetch(url, { ...opt, headers });
+  if (!r.ok) { let m = ''; try { m = (await r.json()).error.message; } catch {} throw new Error(`드라이브 오류 ${r.status} ${m}`); }
+  return r;
+}
+async function openDriveIds(ids, rks, hint) {
+  await getToken(hint);
+  const files = [];
+  try {
+    for (let i = 0; i < ids.length; i++) {
+      const id = ids[i]; busy(true, `드라이브에서 받는 중... ${i + 1}/${ids.length}`);
+      const rk = rks && rks[id] ? `${id}/${rks[id]}` : undefined;
+      const meta = await (await dfetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(id)}?fields=id,name,mimeType,parents&supportsAllDrives=true`, {}, rk)).json();
+      const blob = await (await dfetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(id)}?alt=media&supportsAllDrives=true`, {}, rk)).blob();
+      const f = new File([blob], meta.name, { type: meta.mimeType || blob.type });
+      f._drive = { id: meta.id, name: meta.name, parents: meta.parents || [] };
+      files.push(f);
+    }
+  } finally { busy(false); }
+  await importFiles(files, S.pages.length);
+}
+const qEsc = s => s.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+async function saveToDrive() {
+  if (document.activeElement && document.activeElement.isContentEditable) document.activeElement.blur();
+  const dsrc = S.pages.map(p => S.sources.get(p.src)).find(s => s.drive);
+  if (!dsrc) return toast('드라이브에서 연 파일이 없습니다');
+  try { await getToken(); } catch (e) { return toast(e.message, 5000); }
+  const parent = dsrc.drive.parents[0];
+  const raster = askRaster(S.pages);
+  busy(true, 'PDF 만드는 중...');
+  try {
+    const bytes = await buildPdf(S.pages, raster, (i, n) => $('#busyText').textContent = `PDF 만드는 중... ${i}/${n}쪽`);
+    $('#busyText').textContent = '드라이브에 올리는 중...';
+    const { b, n } = baseName();
+    const stem = n > 1 ? `${b}_외${n - 1}건_합본` : `${b}_수정`;
+    let N = 1;
+    try {
+      const q = `name contains '${qEsc(stem)}' and trashed=false` + (parent ? ` and '${qEsc(parent)}' in parents` : '');
+      const lr = await (await dfetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(name)&pageSize=200&supportsAllDrives=true&includeItemsFromAllDrives=true`)).json();
+      const re = new RegExp('^' + stem.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(\\d*)');
+      for (const f of lr.files || []) { const m = f.name.match(re); if (m) N = Math.max(N, (parseInt(m[1], 10) || 1) + 1); }
+    } catch (e) { console.warn(e); }
+    const name = n > 1 ? `${stem}${N > 1 ? N : ''}.pdf` : `${stem}${N}.pdf`;
+    const init = await dfetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&supportsAllDrives=true', {
+      method: 'POST', headers: { 'Content-Type': 'application/json; charset=UTF-8', 'X-Upload-Content-Type': 'application/pdf' },
+      body: JSON.stringify({ name, mimeType: 'application/pdf', ...(parent ? { parents: [parent] } : {}) }),
+    });
+    const loc = init.headers.get('Location');
+    if (!loc) throw new Error('업로드 주소를 받지 못했습니다');
+    const put = await fetch(loc, { method: 'PUT', body: new Blob([bytes], { type: 'application/pdf' }) });
+    if (!put.ok) throw new Error('업로드 실패 ' + put.status);
+    const meta = await put.json();
+    S.dirty = false; updateStatus();
+    toast(`드라이브에 저장했습니다: ${meta.name || name}${parent ? ' (원본과 같은 폴더)' : ' (내 드라이브)'}`, 6000);
+  } catch (e) { console.error(e); alert('드라이브에 저장하지 못했습니다: ' + (e.message || e)); }
+  finally { busy(false); }
+}
+$('#bDriveSave').onclick = saveToDrive;
+// opened from Drive "연결 앱"
+(() => {
+  const st = new URLSearchParams(location.search).get('state'); if (!st) return;
+  let s; try { s = JSON.parse(st); } catch { return; }
+  history.replaceState(null, '', location.pathname);
+  if (s.action !== 'open') return;
+  if (!s.ids || !s.ids.length) { toast('구글 문서·시트 파일은 열 수 없습니다. PDF나 사진을 고르세요.', 5000); return; }
+  loadGis().catch(() => {});
+  $('#driveGateMsg').textContent = `드라이브에서 고른 파일 ${s.ids.length}개를 엽니다. 아래 버튼을 누르고 구글 계정을 확인해 주세요.`;
+  $('#driveGate').hidden = false;
+  $('#bDriveOpen').onclick = async () => {
+    $('#driveGate').hidden = true;
+    try { await openDriveIds(s.ids, s.resourceKeys, s.userId); }
+    catch (e) { $('#driveGateMsg').textContent = '열지 못했습니다: ' + e.message; $('#driveGate').hidden = false; }
+  };
+})();
+
+// ---------- 연결 설정 (드라이브 등록 / PC 앱 설치) ----------
+let deferredInstall = null;
+addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferredInstall = e; });
+addEventListener('appinstalled', () => { $('#pwaMsg').textContent = '설치했습니다. 이제 탐색기에서 PDF 오른쪽 클릭 → 연결 프로그램에 나타납니다.'; });
+$('#bLink').onclick = () => {
+  if (location.protocol !== 'https:') { alert('연결 설정은 인터넷 주소(https://balhae.claimworks.kr/balhae-pdf/)로 연 편집기에서만 할 수 있습니다.'); return; }
+  loadGis().catch(() => {});
+  if (matchMedia('(display-mode: standalone)').matches) $('#pwaMsg').textContent = '지금 PC 앱으로 실행 중입니다 (설치 완료).';
+  $('#dlgLink').showModal();
+};
+$('#bDriveInstall').onclick = async () => {
+  const m = $('#driveInstallMsg'); m.textContent = '구글 계정 창에서 계정을 고르고 [계속]을 누르세요...';
+  try { await getToken(undefined, true); m.textContent = '등록했습니다. 드라이브에서 PDF 오른쪽 클릭 → 연결 앱에 나타납니다 (반영까지 몇 분 걸릴 수 있음).'; }
+  catch (e) { m.textContent = '등록하지 못했습니다: ' + e.message; }
+};
+$('#bPwaInstall').onclick = async () => {
+  const m = $('#pwaMsg');
+  if (matchMedia('(display-mode: standalone)').matches) { m.textContent = '이미 PC 앱으로 설치되어 있습니다.'; return; }
+  if (deferredInstall) { deferredInstall.prompt(); const r = await deferredInstall.userChoice; deferredInstall = null; m.textContent = r.outcome === 'accepted' ? '설치했습니다.' : '설치를 취소했습니다.'; }
+  else m.textContent = '주소창 오른쪽의 설치 아이콘(모니터에 화살표)을 누르거나, 브라우저 메뉴(⋮) → 앱 또는 「저장 및 공유」 → 「페이지를 앱으로 설치」를 누르세요. 이미 설치했다면 이 버튼은 동작하지 않습니다.';
+};
+// opened from Windows Explorer (연결 프로그램)
+if ('launchQueue' in window) {
+  launchQueue.setConsumer(async params => {
+    if (!params.files || !params.files.length) return;
+    const files = [];
+    for (const h of params.files) { try { const f = await h.getFile(); f._handle = h; files.push(f); } catch (e) { console.warn(e); } }
+    if (files.length) importFiles(files, S.pages.length);
+  });
+}
+if (location.protocol === 'https:' && 'serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(e => console.warn(e));
 
 setTool('select'); updateStatus();
 window.__balhaePdf = { S, buildPdf, importFiles };
