@@ -243,6 +243,7 @@ footer #hint{margin-left:12px}
 <dialog id="dlgLink">
   <form method="dialog">
     <h3>바로 열기 연결 설정</h3>
+    <p class="small">처음 설치하는 분·다른 직원에게 안내할 때는 <a href="install.html" target="_blank" rel="noopener"><b>설치 안내 페이지</b></a>를 보내 주세요.</p>
     <div class="sec">
       <b>1. 구글 드라이브</b>
       <p>등록하면 드라이브에서 PDF를 오른쪽 클릭 → <b>연결 앱 → 발해 PDF 편집기</b>로 바로 열립니다. 구글 계정마다 한 번만 하면 되고, 다른 컴퓨터에서도 같은 계정이면 바로 됩니다.</p>
@@ -268,7 +269,13 @@ footer #hint{margin-left:12px}
       목록에 발해 PDF 편집기가 없으면 2번 설치를 먼저 하세요. 되돌리려면 같은 방법으로 다른 앱을 고르면 됩니다.</p>
     </div>
     <div class="sec">
-      <b>4. 업데이트</b>
+      <b>4. 크롬 확장 프로그램 (Adobe가 대신 뜨는 경우)</b>
+      <p>크롬·구글 드라이브 웹에서 PDF가 Adobe로 열리면 발해 PDF 확장을 넣으세요. 크롬에서 여는 PDF가 발해 PDF로 열리고, 버튼 하나로 Adobe 확장을 끕니다.</p>
+      <a class="primary" href="balhae-pdf-extension.zip" download="발해PDF_크롬확장.zip" style="display:inline-block;background:var(--accent);color:#fff;border-radius:6px;padding:5px 10px;text-decoration:none">확장 프로그램 받기</a>
+      <p class="small">압축을 푼 뒤 크롬 주소창에 chrome://extensions → 「개발자 모드」 → 「압축해제된 확장 프로그램을 로드합니다」 → 푼 폴더 선택. 자세한 설명은 설치 안내 페이지 4번.</p>
+    </div>
+    <div class="sec">
+      <b>5. 업데이트</b>
       <p>지금 버전: <b id="verNow"></b>. 인터넷에 연결돼 있으면 열 때마다, 그리고 30분마다 새 버전을 확인해 알려 드립니다.</p>
       <button type="button" id="bUpdCheck" class="primary">지금 업데이트 확인</button>
       <span id="updMsg" class="msg"></span>
@@ -393,6 +400,19 @@ function textWidth(str, size) { mctx.font = `${size}px BalhaeKR`; return mctx.me
 function textBox(a) {
   const lines = (a.text || '').split('\n'); const pad = a.pad || 0;
   return { w: Math.max(4, ...lines.map(l => textWidth(l, a.size))) + 2 * pad, h: lines.length * a.size * LH + 2 * pad };
+}
+
+// ---------- 크롬 확장 프로그램 안에서 열렸을 때 ----------
+const EXT_ORIGINS = ['chrome-extension://lgpnemgoffjjddfgnfojcnfoiblpacbe'];
+const EMBED = window.parent !== window && new URLSearchParams(location.search).has('embed');
+let embedParent = null, embedSeq = 0;
+const embedWait = new Map();
+function embedAsk(msg, transfer) {
+  return new Promise(res => {
+    if (!embedParent) return res({ ok: false, message: '확장 프로그램과 연결되지 않았습니다' });
+    const id = ++embedSeq; embedWait.set(id, res);
+    window.parent.postMessage({ ...msg, reqId: id }, embedParent, transfer || []);
+  });
 }
 
 // ---------- state ----------
@@ -1355,7 +1375,11 @@ async function savePdf(mode) {
   if (!list.length) return toast('저장할 쪽을 왼쪽 목록에서 선택하세요 (Ctrl·Shift+클릭)');
   const name = suggestName(mode);
   let handle = null;
-  if (window.showSaveFilePicker) {
+  if (EMBED) {
+    const r = await embedAsk({ type: 'balhae-pick', name });
+    if (r.abort) return;
+    if (r.ok) handle = { embed: true, id: r.id, name: r.name || name };
+  } else if (window.showSaveFilePicker) {
     const startIn = S.pages.map(p => S.sources.get(p.src)).find(s => s.handle)?.handle;
     try { handle = await showSaveFilePicker({ suggestedName: name, ...(startIn ? { startIn } : {}), types: [{ description: 'PDF 문서', accept: { 'application/pdf': ['.pdf'] } }] }); }
     catch (e) { if (e.name === 'AbortError') return; handle = null; }
@@ -1364,7 +1388,12 @@ async function savePdf(mode) {
   busy(true, 'PDF 만드는 중...');
   try {
     const bytes = await buildPdf(list, raster, (i, n) => $('#busyText').textContent = `PDF 만드는 중... ${i}/${n}쪽`);
-    if (handle) { const w = await handle.createWritable(); await w.write(bytes); await w.close(); toast(`저장했습니다: ${handle.name} (${(bytes.length / 1048576).toFixed(1)}MB)`, 4000); }
+    if (handle && handle.embed) {
+      const buf = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+      const r = await embedAsk({ type: 'balhae-write', id: handle.id, buffer: buf }, [buf]);
+      if (!r.ok) throw new Error(r.message || '파일을 쓰지 못했습니다');
+      toast(`저장했습니다: ${handle.name} (${(bytes.length / 1048576).toFixed(1)}MB)`, 4000);
+    } else if (handle) { const w = await handle.createWritable(); await w.write(bytes); await w.close(); toast(`저장했습니다: ${handle.name} (${(bytes.length / 1048576).toFixed(1)}MB)`, 4000); }
     else download(bytes, name);
     if (mode !== 'sel') { S.dirty = false; updateStatus(); }
   } catch (e) { console.error(e); alert('저장하지 못했습니다: ' + (e.message || e)); }
@@ -1529,7 +1558,7 @@ $('#bDriveSave').onclick = saveToDrive;
 
 // ---------- 연결 설정 (드라이브 등록 / PC 앱 설치) ----------
 let deferredInstall = null;
-addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferredInstall = e; if (!matchMedia('(display-mode: standalone)').matches) $('#bInstall').hidden = false; });
+addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferredInstall = e; if (!EMBED && !matchMedia('(display-mode: standalone)').matches) $('#bInstall').hidden = false; });
 $('#bInstall').onclick = async () => {
   if (!deferredInstall) { $('#bLink').click(); return; }
   deferredInstall.prompt(); const r = await deferredInstall.userChoice; deferredInstall = null; $('#bInstall').hidden = true;
@@ -1579,10 +1608,10 @@ if ('launchQueue' in window) {
     if (files.length) importFiles(files, S.pages.length);
   });
 }
-if (location.protocol === 'https:' && 'serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(e => console.warn(e));
+if (!EMBED && location.protocol === 'https:' && 'serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(e => console.warn(e));
 
 // ---------- 업데이트 ----------
-const APP_VERSION = '2026.10.13-1611';
+const APP_VERSION = '2026.10.13-1642';
 $('#stVer').textContent = 'v' + APP_VERSION + ' · 업데이트 확인';
 $('#verNow').textContent = 'v' + APP_VERSION;
 let lastUpdCheck = 0, updDismissed = '';
@@ -1610,7 +1639,7 @@ async function applyUpdate() {
   try { const reg = await navigator.serviceWorker?.getRegistration(); if (reg) await reg.update(); } catch {}
   try { for (const k of await caches.keys()) await caches.delete(k); } catch {}
   try { await fetch(location.pathname, { cache: 'reload' }); } catch {}
-  location.replace(location.pathname + location.hash);
+  location.replace(location.pathname + (EMBED ? '?embed=1' : '') + location.hash);
 }
 $('#bUpdGo').onclick = applyUpdate;
 $('#bUpdLater').onclick = () => { updDismissed = $('#updBar').dataset.ver || ''; $('#updBar').hidden = true; };
@@ -1620,6 +1649,22 @@ if (location.protocol === 'https:') {
   setTimeout(() => checkUpdate(false), 4000);
   setInterval(() => checkUpdate(false), 30 * 60 * 1000);
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && Date.now() - lastUpdCheck > 10 * 60 * 1000) checkUpdate(false); });
+}
+
+if (EMBED) {
+  addEventListener('message', async e => {
+    if (!EXT_ORIGINS.includes(e.origin)) return;
+    embedParent = e.origin;
+    const d = e.data || {};
+    if (d.reqId && embedWait.has(d.reqId)) { const r = embedWait.get(d.reqId); embedWait.delete(d.reqId); r(d); return; }
+    if (d.type === 'balhae-open' && Array.isArray(d.files)) {
+      const files = d.files.map(f => new File([f.buffer], f.name || 'document.pdf', { type: f.type || 'application/pdf' }));
+      await importFiles(files, S.pages.length);
+      if (files[0]) window.parent.postMessage({ type: 'balhae-title', title: files[0].name + ' - 발해 PDF' }, embedParent);
+    }
+    if (d.type === 'balhae-error') toast(d.message || 'PDF를 받지 못했습니다', 6000);
+  });
+  window.parent.postMessage({ type: 'balhae-ready', version: APP_VERSION }, '*');
 }
 
 setTool('select'); updateStatus();
