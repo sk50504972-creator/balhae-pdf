@@ -1,0 +1,60 @@
+{
+  "name": "발해 PDF 편집기",
+  "short_name": "발해 PDF",
+  "description": "PDF 보기·합치기·쪽 편집·텍스트 수정·마스킹 (손해사정 업무용)",
+  "id": "/balhae-pdf/",
+  "start_url": "/balhae-pdf/",
+  "scope": "/balhae-pdf/",
+  "display": "standalone",
+  "background_color": "#e6eaf0",
+  "theme_color": "#1f3a5f",
+  "lang": "ko",
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "file_handlers": [
+    {
+      "action": "/balhae-pdf/",
+      "accept": {
+        "application/pdf": [
+          ".pdf"
+        ],
+        "image/jpeg": [
+          ".jpg",
+          ".jpeg"
+        ],
+        "image/png": [
+          ".png"
+        ]
+      },
+      "icons": [
+        {
+          "src": "icons/icon-256.png",
+          "sizes": "256x256",
+          "type": "image/png"
+        }
+      ],
+      "launch_type": "multiple-clients"
+    }
+  ],
+  "launch_handler": {
+    "client_mode": "navigate-new"
+  }
+}
