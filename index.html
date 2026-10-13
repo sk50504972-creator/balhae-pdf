@@ -33,10 +33,10 @@ main{flex:1;display:flex;min-height:0}
 #split:hover::after,#split.drag::after{background:var(--accent)}
 body.resizing{cursor:col-resize;user-select:none}
 body.resizing #viewer,body.resizing #thumbs{pointer-events:none}
-#thumbs{width:172px;flex:none;overflow-y:auto;background:#f3f5f8;border-right:1px solid var(--line);padding:10px 0;outline:none}
+#thumbs{width:172px;flex:none;overflow-y:auto;background:#f3f5f8;border-right:1px solid var(--line);padding:10px 6px;outline:none;display:flex;flex-wrap:wrap;align-content:flex-start;justify-content:center;gap:6px 6px;position:relative}
 #thumbs:focus{box-shadow:inset 0 0 0 2px #c9dafa}
-.thumb{margin:0 auto 10px;width:calc(100% - 28px);padding:6px 6px 4px;border-radius:6px;border:2px solid transparent;position:relative;cursor:pointer}
-.thumb .tc{background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);margin:0 auto;overflow:hidden;width:100%}
+.thumb{flex:none;margin:0;width:136px;padding:6px 6px 4px;border-radius:6px;border:2px solid transparent;position:relative;cursor:pointer}
+.thumb .tc{background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);margin:0 auto;overflow:hidden;width:120px}
 .thumb .tc canvas{width:100%;height:100%;display:block}
 .thumb .tl{text-align:center;font-size:11px;color:#56627a;margin-top:4px}
 .thumb.sel{background:#dbe7fb;border-color:#8fb2ee}
@@ -45,7 +45,7 @@ body.resizing #viewer,body.resizing #thumbs{pointer-events:none}
 .thumb:hover .tb{display:flex}
 .thumb .tb button{padding:0 5px;font-size:12px;background:rgba(255,255,255,.96);line-height:18px}
 .thumb.dragging{opacity:.4}
-.dropline{height:3px;background:var(--accent);margin:-6px 12px 3px;border-radius:2px;pointer-events:none}
+.dropline{position:absolute;width:4px;background:var(--accent);border-radius:2px;pointer-events:none;z-index:5;box-shadow:0 0 0 2px rgba(47,111,222,.25)}
 #viewer{flex:1;overflow:auto;position:relative;outline:none}
 #pages{padding:22px 24px 70px;display:flex;flex-direction:column;align-items:center;gap:34px;min-width:min-content}
 .page{position:relative;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.18);flex:none}
@@ -875,9 +875,9 @@ const thumbsEl = $('#thumbs');
 
 // ---------- resizable thumbnail panel ----------
 const TW_KEY = 'balhae-pdf-thumbw', TW_DEF = 172;
-const clampTW = v => Math.round(Math.min(Math.max(120, innerWidth * 0.6), Math.max(120, v)));
+const clampTW = v => Math.round(Math.min(Math.max(170, innerWidth * 0.7), Math.max(170, v)));
 let thumbW = clampTW(+localStorage.getItem(TW_KEY) || TW_DEF);
-function thumbImgW() { return Math.max(60, thumbW - 52); }
+function thumbImgW() { return 120; }
 function applyThumbW() { thumbsEl.style.width = thumbW + 'px'; }
 applyThumbW();
 (() => {
@@ -895,11 +895,10 @@ applyThumbW();
     if (!active) return; active = false;
     sp.classList.remove('drag'); document.body.classList.remove('resizing');
     try { localStorage.setItem(TW_KEY, thumbW); } catch {}
-    clearTimeout(rt); renderThumbs();
     document.querySelector('.thumb.cur')?.scrollIntoView({ block: 'nearest' });
   };
   sp.addEventListener('pointerup', end); sp.addEventListener('pointercancel', end);
-  sp.addEventListener('dblclick', () => { thumbW = TW_DEF; applyThumbW(); try { localStorage.setItem(TW_KEY, thumbW); } catch {} renderThumbs(); });
+  sp.addEventListener('dblclick', () => { thumbW = TW_DEF; applyThumbW(); try { localStorage.setItem(TW_KEY, thumbW); } catch {} });
 })();
 thumbsEl.addEventListener('click', e => {
   const t = e.target.closest('.thumb'); if (!t) return;
@@ -922,17 +921,26 @@ thumbsEl.addEventListener('click', e => {
   document.querySelectorAll('.thumb').forEach(el => el.classList.toggle('sel', S.selected.has(el.dataset.id)));
   scrollToPage(id); updateStatus();
 });
-function thumbInsertIndex(clientY) {
+function thumbInsertIndex(clientX, clientY) {
   const els = [...thumbsEl.querySelectorAll('.thumb')];
-  for (let i = 0; i < els.length; i++) { const r = els[i].getBoundingClientRect(); if (clientY < r.top + r.height / 2) return i; }
+  for (let i = 0; i < els.length; i++) {
+    const r = els[i].getBoundingClientRect();
+    if (clientY < r.top) return i;
+    if (clientY <= r.bottom && clientX < r.left + r.width / 2) return i;
+  }
   return els.length;
 }
 function showDropLine(idx) {
-  thumbsEl.querySelectorAll('.dropline').forEach(e => e.remove());
-  if (idx < 0) return;
-  const line = document.createElement('div'); line.className = 'dropline';
-  const els = thumbsEl.querySelectorAll('.thumb');
-  if (idx < els.length) thumbsEl.insertBefore(line, els[idx]); else thumbsEl.appendChild(line);
+  let line = thumbsEl.querySelector('.dropline');
+  if (idx < 0) { line?.remove(); return; }
+  const els = thumbsEl.querySelectorAll('.thumb'); if (!els.length) { line?.remove(); return; }
+  if (!line) { line = document.createElement('div'); line.className = 'dropline'; thumbsEl.appendChild(line); }
+  const host = thumbsEl.getBoundingClientRect();
+  const ref = els[Math.min(idx, els.length - 1)].getBoundingClientRect();
+  const x = idx < els.length ? ref.left - 5 : ref.right + 1;
+  line.style.left = (x - host.left + thumbsEl.scrollLeft) + 'px';
+  line.style.top = (ref.top - host.top + thumbsEl.scrollTop + 4) + 'px';
+  line.style.height = (ref.height - 8) + 'px';
 }
 thumbsEl.addEventListener('dragstart', e => {
   const t = e.target.closest('.thumb'); if (!t) return;
@@ -948,7 +956,7 @@ thumbsEl.addEventListener('dragover', e => {
   if (!dragIds && !isFiles) return;
   e.preventDefault(); e.stopPropagation();
   e.dataTransfer.dropEffect = isFiles ? 'copy' : 'move';
-  const idx = thumbInsertIndex(e.clientY);
+  const idx = thumbInsertIndex(e.clientX, e.clientY);
   if (idx !== dropIdx) { dropIdx = idx; showDropLine(idx); }
   const r = thumbsEl.getBoundingClientRect();
   if (e.clientY < r.top + 40) thumbsEl.scrollTop -= 12; else if (e.clientY > r.bottom - 40) thumbsEl.scrollTop += 12;
@@ -956,7 +964,7 @@ thumbsEl.addEventListener('dragover', e => {
 thumbsEl.addEventListener('dragleave', e => { if (!thumbsEl.contains(e.relatedTarget)) { dropIdx = -1; showDropLine(-1); } });
 thumbsEl.addEventListener('drop', e => {
   e.preventDefault(); e.stopPropagation(); document.body.classList.remove('dragover');
-  const idx = thumbInsertIndex(e.clientY); showDropLine(-1); dropIdx = -1;
+  const idx = thumbInsertIndex(e.clientX, e.clientY); showDropLine(-1); dropIdx = -1;
   if (e.dataTransfer.files.length) importFiles(e.dataTransfer.files, idx);
   else if (dragIds) movePages(dragIds, idx);
   dragIds = null;
