@@ -19,14 +19,17 @@ Say '=== 발해 PDF 편집기 설치 도우미 ===' 'Cyan'
 New-Item -ItemType Directory -Force -Path $Dir | Out-Null
 try { Invoke-WebRequest -UseBasicParsing "$Base/icons/balhae-pdf-file.ico" -OutFile $Ico } catch {}
 
+$browser = @("$env:ProgramFiles\Google\Chrome\Application\chrome.exe", "${env:ProgramFiles(x86)}\Google\Chrome\Application\chrome.exe", "$env:LOCALAPPDATA\Google\Chrome\Application\chrome.exe", "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe", "$env:ProgramFiles\Microsoft\Edge\Application\msedge.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1
+$isEdge = $browser -and ($browser -match 'msedge')
+function Open-Url($u) { if ($browser) { Start-Process $browser $u } else { Start-Process $u } }
+
 # 1) 앱 설치 확인
 $ids = @(Find-ProgIds)
 if ($ids.Count -eq 0) {
-  $browser = @("$env:ProgramFiles\Google\Chrome\Application\chrome.exe", "${env:ProgramFiles(x86)}\Google\Chrome\Application\chrome.exe", "$env:LOCALAPPDATA\Google\Chrome\Application\chrome.exe", "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe", "$env:ProgramFiles\Microsoft\Edge\Application\msedge.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1
   Say ''
   Say '[1단계] 앱 설치' 'Yellow'
   Say '방금 열린 브라우저 창에서 [PC 앱으로 설치] 버튼(또는 주소창 오른쪽 설치 아이콘)을 누르세요.'
-  if ($browser) { Start-Process $browser "$Base/#install" } else { Start-Process "$Base/#install" }
+  Open-Url "$Base/#install"
   for ($i = 0; $i -lt 6 -and $ids.Count -eq 0; $i++) {
     Read-Host '설치가 끝나면 이 창에서 Enter 를 누르세요' | Out-Null
     Start-Sleep -Seconds 2
@@ -68,5 +71,41 @@ if ($ids -contains $cur) {
   Start-Process rundll32.exe "shell32.dll,OpenAs_RunDLL $pdf"
   Say '창이 안 뜨면: 설정 > 앱 > 기본 앱 > 위 검색칸에 .pdf > 발해 PDF 편집기 선택 > [기본값 설정]'
 }
+Say '탐색기 아이콘이 바로 안 바뀌면 탐색기 창을 닫았다 다시 여세요.'
+
+# 4) 크롬 확장 프로그램 (선택)
 Say ''
-Say '완료. 탐색기 아이콘이 바로 안 바뀌면 탐색기 창을 닫았다 다시 여세요.' 'Cyan'
+$a = Read-Host '[선택] 크롬 확장 프로그램도 설치할까요? 크롬·구글 드라이브 웹에서 PDF가 Adobe로 열리는 것을 막아 줍니다 (Y/N)'
+if ($a -match '^(y|Y|예|ㅛ)') {
+  $ExtDir = Join-Path $Dir 'extension'
+  $zip = Join-Path $env:TEMP 'balhae-pdf-extension.zip'
+  try {
+    Invoke-WebRequest -UseBasicParsing "$Base/balhae-pdf-extension.zip" -OutFile $zip
+    New-Item -ItemType Directory -Force -Path $ExtDir | Out-Null
+    Expand-Archive -Path $zip -DestinationPath $ExtDir -Force
+    Set-Clipboard -Value $ExtDir
+    Say "확장 프로그램 파일을 준비했습니다: $ExtDir" 'Green'
+    Say '이 폴더 주소는 복사해 두었습니다 (붙여넣기 Ctrl+V).'
+    Say '곧 열리는 확장 프로그램 화면에서:'
+    Say '  1) 오른쪽 위 「개발자 모드」를 켭니다.'
+    Say '  2) 왼쪽 위 「압축해제된 확장 프로그램을 로드합니다」를 누릅니다.'
+    Say '  3) 폴더 선택 창 위쪽 주소칸을 클릭하고 Ctrl+V → Enter → [폴더 선택].'
+    Say '  4) 퍼즐 아이콘에서 발해 PDF 편집기를 고정(핀)하고, 아이콘을 눌러 「Adobe Acrobat 확장 끄기」를 누르면 끝.'
+    Say '  (이미 설치돼 있으면 발해 PDF 편집기 카드의 새로고침 ↻ 아이콘만 누르면 최신으로 바뀝니다)'
+    if ($isEdge) { Open-Url 'edge://extensions/' } else { Open-Url 'chrome://extensions/' }
+    Read-Host '다 했으면 Enter' | Out-Null
+  } catch { Say ('확장 프로그램을 받지 못했습니다: ' + $_) 'Red' }
+}
+
+# 5) 구글 드라이브 연결 (선택)
+Say ''
+$b = Read-Host '[선택] 구글 드라이브 웹에서도 PDF를 발해 PDF로 열게 할까요? (Y/N)'
+if ($b -match '^(y|Y|예|ㅛ)') {
+  Say '열리는 발해 PDF 창의 1번 [구글 드라이브에 등록]을 누르고 내 구글 계정을 고른 뒤 [계속]을 누르세요.'
+  Open-Url "$Base/#install"
+  Read-Host '등록했으면 Enter (다음으로 드라이브 설정을 엽니다)' | Out-Null
+  Say '드라이브 설정 → 「앱 관리」 → 발해 PDF 편집기 「기본값으로 사용」에 체크하세요.'
+  Open-Url 'https://drive.google.com/drive/settings'
+}
+Say ''
+Say '모두 끝났습니다. 이 창은 닫아도 됩니다.' 'Cyan'
