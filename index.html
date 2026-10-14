@@ -430,6 +430,10 @@ function textBox(a) {
 // ---------- 크롬 확장 프로그램 안에서 열렸을 때 ----------
 const EXT_ORIGINS = ['chrome-extension://lgpnemgoffjjddfgnfojcnfoiblpacbe'];
 const EMBED = window.parent !== window && new URLSearchParams(location.search).has('embed');
+const ANDROID = !!window.BalhaeAndroid;
+function bytesToB64(bytes) { return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1] || ''); r.onerror = rej; r.readAsDataURL(new Blob([bytes], { type: 'application/pdf' })); }); }
+let nativeSaveWait = null;
+window.balhaeNativeSaved = (ok, name, picked) => { if (nativeSaveWait) { const r = nativeSaveWait; nativeSaveWait = null; r({ ok, name, picked }); } };
 let embedParent = null, embedSeq = 0;
 const embedWait = new Map();
 function embedAsk(msg, transfer) {
@@ -1400,6 +1404,20 @@ async function savePdf(mode) {
   if (!list.length) return toast('저장할 쪽을 왼쪽 목록에서 선택하세요 (Ctrl·Shift+클릭)');
   const name = suggestName(mode);
   let handle = null;
+  if (ANDROID) {
+    const rasterA = askRaster(list);
+    busy(true, 'PDF 만드는 중...');
+    try {
+      const bytes = await buildPdf(list, rasterA, (i, n) => $('#busyText').textContent = `PDF 만드는 중... ${i}/${n}쪽`);
+      const b64 = await bytesToB64(bytes);
+      busy(false);
+      const r = await new Promise(res => { nativeSaveWait = res; window.BalhaeAndroid.saveFile(name, b64); });
+      if (r.ok) { toast('저장했습니다: ' + (r.name || name), 4000); if (mode !== 'sel') { S.dirty = false; updateStatus(); } }
+      else if (r.picked) alert('저장하지 못했습니다');
+    } catch (e) { alert('저장하지 못했습니다: ' + (e.message || e)); }
+    finally { busy(false); }
+    return;
+  }
   if (EMBED) {
     const r = await embedAsk({ type: 'balhae-pick', name });
     if (r.abort) return;
@@ -1671,10 +1689,10 @@ if ('launchQueue' in window) {
     if (files.length) importFiles(files, S.pages.length);
   });
 }
-if (!EMBED && location.protocol === 'https:' && 'serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(e => console.warn(e));
+if (!EMBED && !ANDROID && location.protocol === 'https:' && 'serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(e => console.warn(e));
 
 // ---------- 업데이트 ----------
-const APP_VERSION = '2026.10.14-1412';
+const APP_VERSION = '2026.10.14-1511';
 $('#stVer').textContent = 'v' + APP_VERSION + ' · 업데이트 확인';
 $('#verNow').textContent = 'v' + APP_VERSION;
 let lastUpdCheck = 0, updDismissed = '';
@@ -1746,7 +1764,7 @@ if (EMBED) {
 
 // ---------- 공유하기 (카카오톡·메일 등) ----------
 let shareFile = null;
-try { if (navigator.canShare && navigator.canShare({ files: [new File(['x'], 'a.pdf', { type: 'application/pdf' })] })) $('#bShare').hidden = false; } catch {}
+try { if (ANDROID || (navigator.canShare && navigator.canShare({ files: [new File(['x'], 'a.pdf', { type: 'application/pdf' })] }))) $('#bShare').hidden = false; } catch {}
 $('#bShare').onclick = async () => {
   if (document.activeElement && document.activeElement.isContentEditable) document.activeElement.blur();
   if (!S.pages.length) return toast('열린 문서가 없습니다');
@@ -1754,6 +1772,7 @@ $('#bShare').onclick = async () => {
   busy(true, '공유할 PDF 만드는 중...');
   try {
     const bytes = await buildPdf(S.pages, raster, (i, n) => $('#busyText').textContent = `PDF 만드는 중... ${i}/${n}쪽`);
+    if (ANDROID) { const b64 = await bytesToB64(bytes); window.BalhaeAndroid.shareFile(suggestName('all'), b64); return; }
     shareFile = new File([bytes], suggestName('all'), { type: 'application/pdf' });
     $('#shareText').textContent = `${shareFile.name} (${(bytes.length / 1048576).toFixed(1)}MB) 준비 완료`;
     $('#shareBar').hidden = false;
@@ -1782,6 +1801,24 @@ $('#bShareX').onclick = () => { $('#shareBar').hidden = true; };
     if (files.length) await importFiles(files, S.pages.length);
   } catch (e) { console.warn(e); toast('공유받은 파일을 열지 못했습니다', 5000); }
 })();
+
+// ---------- 안드로이드 앱 안에서: 다른 앱이 넘겨준 PDF 받기 ----------
+if (ANDROID) {
+  ['#bPrint', '#bInstall', '#bLink', '#bDriveSave'].forEach(s => { const el = $(s); if (el) { el.hidden = true; el.style.display = 'none'; } });
+  window.balhaeNativeCheck = async () => {
+    let list = []; try { list = JSON.parse(window.BalhaeAndroid.takeFiles() || '[]'); } catch {}
+    if (!list.length) return;
+    if (S.pages.length) {
+      if (!S.dirty || confirm('지금 문서를 닫고 새 파일을 열까요?\n[취소]를 누르면 지금 문서 뒤에 붙입니다.')) resetDoc();
+    }
+    busy(true, '파일 받는 중...');
+    const files = [];
+    for (const f of list) { try { const r = await fetch(f.url, { cache: 'no-store' }); if (r.ok) files.push(new File([await r.blob()], f.name || 'document.pdf', { type: f.type || 'application/pdf' })); } catch (e) { console.warn(e); } }
+    busy(false);
+    if (files.length) await importFiles(files, S.pages.length); else toast('파일을 열지 못했습니다', 5000);
+  };
+  setTimeout(() => window.balhaeNativeCheck(), 300);
+}
 
 setTool('select'); updateStatus();
 window.__balhaePdf = { S, buildPdf, importFiles };
