@@ -1,4 +1,4 @@
-const C = 'balhae-pdf-v3';
+const C = 'balhae-pdf-v4';
 self.addEventListener('install', e => { self.skipWaiting(); e.waitUntil(caches.open(C).then(c => c.addAll(['./', './manifest.webmanifest', './icons/icon-192.png'])).catch(() => {})); });
 self.addEventListener('activate', e => e.waitUntil((async () => { for (const k of await caches.keys()) if (k !== C && k !== 'balhae-share') await caches.delete(k); await self.clients.claim(); })()));
 self.addEventListener('fetch', e => {
@@ -19,7 +19,7 @@ self.addEventListener('fetch', e => {
     })());
     return;
   }
-  if (req.method !== 'GET') return;
+  if (req.method !== 'GET' || u.pathname.startsWith('/__native__/')) return;
   if (u.pathname.endsWith('/version.json') || u.pathname.endsWith('/drive-mode.json')) return;
   const nav = req.mode === 'navigate';
   const key = nav ? './' : req;
