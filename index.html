@@ -103,6 +103,29 @@ dialog h3{margin:0 0 12px;color:var(--brand)}
 dialog label{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:8px 0}
 dialog .btns{display:flex;justify-content:flex-end;gap:6px;margin-top:16px}
 #pageNo{width:52px;text-align:center}
+#viewer{touch-action:pan-x pan-y}
+#viewer.tool-draw .ov,#viewer.tool-text .ov,#viewer.tool-edittext .ov,.an{touch-action:none}
+#shareBar{position:fixed;left:50%;bottom:44px;transform:translateX(-50%);background:#fff;border:1px solid #8fb2ee;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.2);padding:12px 14px;display:flex;align-items:center;gap:8px;z-index:49;max-width:94vw;flex-wrap:wrap}
+#shareBar[hidden]{display:none}
+@media (max-width:760px){
+  .row{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding:5px 6px}
+  .row::-webkit-scrollbar{display:none}
+  .grp{flex:none}
+  .brand{font-size:13px}
+  #thumbs{width:92px!important;padding:6px 2px}
+  .thumb{width:80px;padding:3px}
+  .thumb .tc{width:70px}
+  .thumb .tb{display:none!important}
+  #split{display:none}
+  #pages{padding:10px 8px 70px;gap:18px}
+  footer #hint,#stFiles{display:none}
+  #sp{position:fixed;right:0;top:0;bottom:0;z-index:30;width:85vw;box-shadow:-6px 0 20px rgba(0,0,0,.2)}
+  #empty{inset:10px;padding:12px}
+  #empty h2{font-size:17px}
+  dialog{min-width:0;width:94vw;padding:14px}
+  #updBar,#defBar{left:8px;right:8px;transform:none;max-width:none;flex-wrap:wrap}
+  button{padding:7px 10px}
+}
 #driveGate{position:fixed;inset:0;background:rgba(20,30,45,.4);display:flex;align-items:center;justify-content:center;z-index:55}
 #driveGate[hidden]{display:none}
 #driveGate .card{background:#fff;border-radius:12px;padding:24px 28px;box-shadow:0 12px 40px rgba(0,0,0,.25);text-align:center;max-width:420px;line-height:1.6}
@@ -134,6 +157,7 @@ footer #hint{margin-left:12px}
       <button id="bSave" class="primary" title="저장 (Ctrl+S)">저장</button>
       <button id="bSaveSel" title="왼쪽에서 선택한 쪽만 새 PDF로 저장">선택 쪽만 저장</button>
       <button id="bPrint" title="인쇄용으로 열기">인쇄</button>
+      <button id="bShare" hidden title="카카오톡·메일·드라이브 등으로 보내기">공유</button>
       <button id="bDriveSave" hidden title="원본이 있던 구글 드라이브 폴더에 새 파일로 저장 (원본은 그대로)">드라이브에 저장</button>
     </div>
     <div class="grp">
@@ -283,6 +307,7 @@ footer #hint{margin-left:12px}
     <div class="btns"><button value="close" type="submit">닫기</button></div>
   </form>
 </dialog>
+<div id="shareBar" hidden><span id="shareText">PDF를 만들었습니다.</span><button id="bShareGo" class="primary">공유하기</button><button id="bShareDl">내려받기</button><button id="bShareX">닫기</button></div>
 <div id="updBar" hidden><span id="updText"></span><button id="bUpdGo" class="primary">지금 업데이트</button><button id="bUpdLater">나중에</button></div>
 <div id="defBar" hidden><span>이 PC에서 PDF를 더블클릭하면 항상 <b>발해 PDF 편집기</b>로 열리게 할까요?</span><button id="bDefBarGo" class="primary">기본 앱으로 지정</button><button id="bDefBarNo">다음에</button><button id="bDefBarNever">다시 묻지 않기</button></div>
 <div id="driveGate" hidden><div class="card">
@@ -1649,7 +1674,7 @@ if ('launchQueue' in window) {
 if (!EMBED && location.protocol === 'https:' && 'serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(e => console.warn(e));
 
 // ---------- 업데이트 ----------
-const APP_VERSION = '2026.10.13-1720';
+const APP_VERSION = '2026.10.14-1412';
 $('#stVer').textContent = 'v' + APP_VERSION + ' · 업데이트 확인';
 $('#verNow').textContent = 'v' + APP_VERSION;
 let lastUpdCheck = 0, updDismissed = '';
@@ -1704,6 +1729,59 @@ if (EMBED) {
   });
   window.parent.postMessage({ type: 'balhae-ready', version: APP_VERSION }, '*');
 }
+
+// ---------- 휴대폰: 두 손가락 확대·축소 ----------
+(() => {
+  const v = $('#viewer'), pg = $('#pages'); let d0 = 0, z0 = 1, ratio = 1;
+  const dist = t => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+  v.addEventListener('touchstart', e => { if (e.touches.length === 2) { d0 = dist(e.touches); z0 = S.zoom; ratio = 1; } }, { passive: true });
+  v.addEventListener('touchmove', e => {
+    if (e.touches.length !== 2 || !d0) return;
+    e.preventDefault();
+    ratio = Math.min(4 / z0, Math.max(0.25 / z0, dist(e.touches) / d0));
+    pg.style.transformOrigin = 'top center'; pg.style.transform = `scale(${ratio})`;
+  }, { passive: false });
+  v.addEventListener('touchend', e => { if (d0 && e.touches.length < 2) { pg.style.transform = ''; const r = ratio; d0 = 0; if (Math.abs(r - 1) > 0.03) setZoom(z0 * r); } });
+})();
+
+// ---------- 공유하기 (카카오톡·메일 등) ----------
+let shareFile = null;
+try { if (navigator.canShare && navigator.canShare({ files: [new File(['x'], 'a.pdf', { type: 'application/pdf' })] })) $('#bShare').hidden = false; } catch {}
+$('#bShare').onclick = async () => {
+  if (document.activeElement && document.activeElement.isContentEditable) document.activeElement.blur();
+  if (!S.pages.length) return toast('열린 문서가 없습니다');
+  const raster = askRaster(S.pages);
+  busy(true, '공유할 PDF 만드는 중...');
+  try {
+    const bytes = await buildPdf(S.pages, raster, (i, n) => $('#busyText').textContent = `PDF 만드는 중... ${i}/${n}쪽`);
+    shareFile = new File([bytes], suggestName('all'), { type: 'application/pdf' });
+    $('#shareText').textContent = `${shareFile.name} (${(bytes.length / 1048576).toFixed(1)}MB) 준비 완료`;
+    $('#shareBar').hidden = false;
+  } catch (e) { alert('PDF를 만들지 못했습니다: ' + (e.message || e)); }
+  finally { busy(false); }
+};
+$('#bShareGo').onclick = async () => {
+  if (!shareFile) return;
+  try { await navigator.share({ files: [shareFile], title: shareFile.name }); $('#shareBar').hidden = true; }
+  catch (e) { if (e.name !== 'AbortError') toast('공유하지 못했습니다: ' + e.message, 5000); }
+};
+$('#bShareDl').onclick = async () => { if (shareFile) download(new Uint8Array(await shareFile.arrayBuffer()), shareFile.name); $('#shareBar').hidden = true; };
+$('#bShareX').onclick = () => { $('#shareBar').hidden = true; };
+
+// ---------- 다른 앱에서 「공유 → 발해 PDF」로 받은 파일 ----------
+(async () => {
+  if (!new URLSearchParams(location.search).has('shared')) return;
+  history.replaceState(null, '', location.pathname);
+  try {
+    const c = await caches.open('balhae-share');
+    const metaRes = await c.match('/balhae-pdf/__shared__/meta');
+    if (!metaRes) return;
+    const meta = await metaRes.json(); const files = [];
+    for (const m of meta) { const r = await c.match('/balhae-pdf/__shared__/' + m.i); if (r) files.push(new File([await r.blob()], m.name || 'shared.pdf', { type: m.type || 'application/pdf' })); }
+    for (const k of await c.keys()) await c.delete(k);
+    if (files.length) await importFiles(files, S.pages.length);
+  } catch (e) { console.warn(e); toast('공유받은 파일을 열지 못했습니다', 5000); }
+})();
 
 setTool('select'); updateStatus();
 window.__balhaePdf = { S, buildPdf, importFiles };
