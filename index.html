@@ -103,6 +103,30 @@ dialog h3{margin:0 0 12px;color:var(--brand)}
 dialog label{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:8px 0}
 dialog .btns{display:flex;justify-content:flex-end;gap:6px;margin-top:16px}
 #pageNo{width:52px;text-align:center}
+#docTabs{display:flex;gap:3px;align-items:flex-end;background:#dfe5ee;padding:5px 8px 0;overflow-x:auto;flex:none;border-bottom:1px solid var(--line);scrollbar-width:thin}
+.dtab{display:flex;align-items:center;gap:6px;padding:5px 6px 6px 12px;background:#eef2f7;border:1px solid #cfd6df;border-bottom:0;border-radius:8px 8px 0 0;cursor:pointer;max-width:260px;white-space:nowrap;font-size:12px;flex:none;color:#3c4a60}
+.dtab:hover{background:#f6f8fb}
+.dtab.on{background:#fff;font-weight:700;color:var(--brand);box-shadow:0 -2px 0 var(--accent) inset}
+.dtab .t{overflow:hidden;text-overflow:ellipsis}
+.dtab .n{color:#7a8597;font-weight:400}
+.dtab .x{border:0;background:transparent;padding:0 5px;line-height:16px;border-radius:4px;color:#6b7689}
+.dtab .x:hover{background:#e3e8ef;color:#c0392b}
+.dtab.dropok{outline:2px solid var(--accent);background:#dbe7fb}
+#bNewTab{flex:none;margin:0 0 4px 4px;padding:3px 10px;font-size:14px;line-height:18px}
+#side{width:190px;flex:none;border-left:1px solid var(--line);background:#f3f5f8;display:flex;flex-direction:column}
+#side[hidden]{display:none}
+#side .sh{padding:6px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:5px;background:#fff}
+#side .sh .r{display:flex;gap:4px}
+#side .sh button{flex:1;padding:4px 6px;font-size:12px}
+#side select{width:100%}
+#sideList{flex:1;overflow-y:auto;display:flex;flex-wrap:wrap;align-content:flex-start;justify-content:center;gap:6px;padding:8px 4px;position:relative}
+#sideList .empty{font-size:12px;color:#5b6679;padding:10px;line-height:1.6;text-align:center}
+.sthumb{flex:none;width:150px;padding:5px;border-radius:6px;border:2px solid transparent;cursor:grab;position:relative}
+.sthumb .tc{background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);width:130px;margin:0 auto;overflow:hidden}
+.sthumb .tc canvas{width:100%;height:100%;display:block}
+.sthumb .tl{text-align:center;font-size:11px;color:#56627a;margin-top:3px}
+.sthumb.sel{background:#dbe7fb;border-color:#8fb2ee}
+@media (max-width:760px){#side,#bSide{display:none!important}.dtab{max-width:150px}}
 #viewer{touch-action:pan-x pan-y}
 #viewer.tool-draw .ov,#viewer.tool-text .ov,#viewer.tool-edittext .ov,.an{touch-action:none}
 #shareBar{position:fixed;left:50%;bottom:44px;transform:translateX(-50%);background:#fff;border:1px solid #8fb2ee;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.2);padding:12px 14px;display:flex;align-items:center;gap:8px;z-index:49;max-width:94vw;flex-wrap:wrap}
@@ -171,6 +195,8 @@ footer #hint{margin-left:12px}
       <button id="bRotR" title="오른쪽으로 90도">⟳ 회전</button>
       <button id="bDel" title="선택 쪽 삭제 (왼쪽 목록에서 Delete)">쪽 삭제</button>
       <button id="bPno" title="쪽 번호 넣기 (편철용)">쪽번호</button>
+      <button id="bSend" title="선택한 쪽을 다른 문서(탭)로 옮기거나 복사">다른 문서로 ▾</button>
+      <button id="bSide" title="다른 문서의 쪽 목록을 오른쪽에 띄워 서로 끌어다 옮기기">나란히 보기</button>
     </div>
     <div class="spacer"></div>
     <div class="grp">
@@ -206,6 +232,7 @@ footer #hint{margin-left:12px}
     <input id="q" type="search" placeholder="문서 내 글자 검색 (Ctrl+F)">
   </div>
 </header>
+<nav id="docTabs"></nav>
 <main>
   <aside id="thumbs" tabindex="0"></aside>
   <div id="split" title="좌우로 끌어서 미리보기 크기 조절 (더블클릭: 기본 크기)"></div>
@@ -216,12 +243,21 @@ footer #hint{margin-left:12px}
       <div>또는 위의 <b>열기</b> 버튼을 누르세요. 여러 파일을 한꺼번에 놓으면 순서대로 <b>하나로 합쳐집니다</b>.<br>
       사진(JPG·PNG)은 A4 쪽으로 바뀌어 들어갑니다.</div>
       <div class="small">
+        여러 파일을 [열기]로 고르면 각각 탭으로 열립니다 · 쪽을 다른 탭으로 끌어 놓으면 이동(Ctrl 누르고 놓으면 복사) · [나란히 보기]로 두 문서를 같이 보며 옮기기<br>
         왼쪽 목록: 끌어서 순서 변경 · <kbd>Ctrl</kbd>/<kbd>Shift</kbd>+클릭 여러 쪽 선택 · <kbd>Delete</kbd> 쪽 삭제<br>
         <kbd>Ctrl+S</kbd> 저장 · <kbd>Ctrl+Z</kbd> 취소 · <kbd>Ctrl+F</kbd> 검색 · <kbd>Ctrl</kbd>+휠 확대/축소 · 텍스트는 더블클릭으로 다시 고치기<br>
         파일은 이 PC 안에서만 처리되며 인터넷으로 보내지 않습니다.
       </div>
     </div>
   </section>
+  <aside id="side" hidden>
+    <div class="sh">
+      <select id="sideSel" title="옆에 띄울 문서"></select>
+      <div class="r"><button id="sideMove" title="고른 쪽을 지금 문서의 현재 쪽 뒤로 옮기기">← 옮겨오기</button><button id="sideCopy" title="고른 쪽을 지금 문서의 현재 쪽 뒤로 복사">← 복사해오기</button></div>
+      <div class="r"><button id="sideOpen" title="옆 문서로 파일 열기">파일 열기</button><button id="sideClose">닫기</button></div>
+    </div>
+    <div id="sideList"></div>
+  </aside>
   <aside id="sp" hidden>
     <div class="sph"><span id="spTitle">검색 결과</span><button id="spClose">닫기</button></div>
     <div id="spList"></div>
@@ -234,6 +270,8 @@ footer #hint{margin-left:12px}
 <input id="fSign" type="file" accept="image/*" hidden>
 
 <div id="signMenu" class="menu" hidden></div>
+<div id="sendMenu" class="menu" hidden></div>
+<input id="fSide" type="file" multiple accept=".pdf,application/pdf,image/*" hidden>
 <div id="stampMenu" class="menu" hidden></div>
 
 <dialog id="dlgPno">
@@ -480,6 +518,7 @@ function updateStatus() {
   $('#zoomVal').textContent = Math.round(S.zoom * 100) + '%';
   const used = new Set(S.pages.map(p => p.src));
   $('#bDriveSave').hidden = ![...S.sources.values()].some(s => s.drive && used.has(s.id));
+  if (typeof scheduleTabs === 'function') scheduleTabs();
 }
 
 // ---------- undo ----------
@@ -1106,15 +1145,15 @@ thumbsEl.addEventListener('dragstart', e => {
   const id = t.dataset.id;
   dragIds = S.selected.has(id) ? S.pages.filter(p => S.selected.has(p.id)).map(p => p.id) : [id];
   e.dataTransfer.setData('text/x-balhae-pages', dragIds.join(','));
-  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.effectAllowed = 'copyMove';
   requestAnimationFrame(() => dragIds && dragIds.forEach(i => document.querySelector(`.thumb[data-id="${i}"]`)?.classList.add('dragging')));
 });
 thumbsEl.addEventListener('dragend', () => { dragIds = null; showDropLine(-1); document.querySelectorAll('.thumb.dragging').forEach(e => e.classList.remove('dragging')); });
 thumbsEl.addEventListener('dragover', e => {
   const isFiles = e.dataTransfer.types.includes('Files');
-  if (!dragIds && !isFiles) return;
+  if (!dragIds && !isFiles && !sideDrag) return;
   e.preventDefault(); e.stopPropagation();
-  e.dataTransfer.dropEffect = isFiles ? 'copy' : 'move';
+  e.dataTransfer.dropEffect = isFiles || (sideDrag && (e.ctrlKey || e.altKey)) ? 'copy' : 'move';
   const idx = thumbInsertIndex(e.clientX, e.clientY);
   if (idx !== dropIdx) { dropIdx = idx; showDropLine(idx); }
   const r = thumbsEl.getBoundingClientRect();
@@ -1125,6 +1164,7 @@ thumbsEl.addEventListener('drop', e => {
   e.preventDefault(); e.stopPropagation(); document.body.classList.remove('dragover');
   const idx = thumbInsertIndex(e.clientX, e.clientY); showDropLine(-1); dropIdx = -1;
   if (e.dataTransfer.files.length) importFiles(e.dataTransfer.files, idx);
+  else if (sideDrag) { const sd = sideDrag; sideDrag = null; transferPages(sd.from, sd.ids, ACTIVE, idx, e.ctrlKey || e.altKey); }
   else if (dragIds) movePages(dragIds, idx);
   dragIds = null;
 });
@@ -1134,27 +1174,20 @@ addEventListener('dragleave', e => { if (!e.relatedTarget) document.body.classLi
 addEventListener('drop', e => { e.preventDefault(); document.body.classList.remove('dragover'); if (e.dataTransfer.files.length) importFiles(e.dataTransfer.files, S.pages.length); });
 
 // ---------- open / add ----------
-$('#bOpen').onclick = () => {
-  if (S.pages.length && S.dirty && !confirm('저장하지 않은 변경이 있습니다. 지금 문서를 닫고 새로 열까요?')) return;
-  $('#fOpen').click();
-};
+$('#bOpen').onclick = () => $('#fOpen').click();
 function resetDoc() {
   if (document.activeElement && document.activeElement.isContentEditable) document.activeElement.blur();
   S.pages = []; S.selected = new Set(); S.undo = []; S.redo = []; S.sel = null; S.hits = {}; S.currentId = null; S.dirty = false;
-  mainCache.clear(); thumbCache.clear(); textCache.clear();
-  for (const s of S.sources.values()) try { s.pdf.destroy(); } catch {}
-  S.sources.clear(); $('#sp').hidden = true; $('#q').value = '';
-  refresh();
+  $('#sp').hidden = true; $('#q').value = '';
+  refresh(); if (typeof gcSources === 'function') gcSources();
 }
 $('#bClose').onclick = () => {
-  if (!S.pages.length) return toast('열려 있는 문서가 없습니다');
-  if (S.dirty && !confirm('저장하지 않은 변경이 있습니다. 저장하지 않고 닫을까요?')) return;
-  resetDoc(); toast('문서를 닫았습니다');
+  if (!S.pages.length && DOCS.length <= 1) return toast('열려 있는 문서가 없습니다');
+  if (closeDoc(ACTIVE)) toast('문서를 닫았습니다');
 };
 $('#fOpen').onchange = async e => {
   const files = e.target.files; if (!files.length) return;
-  resetDoc();
-  await importFiles(files, 0); e.target.value = '';
+  await openFilesAsTabs(files); e.target.value = '';
 };
 $('#bAdd').onclick = () => $('#fAdd').click();
 $('#fAdd').onchange = async e => { await importFiles(e.target.files, S.pages.length ? curIndex() + 1 : 0); e.target.value = ''; };
@@ -1167,7 +1200,7 @@ function openMenu(menu, btn) {
   document.querySelectorAll('.menu').forEach(m => { if (m !== menu) m.hidden = true; });
   const r = btn.getBoundingClientRect(); menu.style.left = r.left + 'px'; menu.style.top = r.bottom + 4 + 'px'; menu.hidden = !menu.hidden;
 }
-addEventListener('pointerdown', e => { if (!e.target.closest('.menu') && !e.target.closest('#bSign,#bStamp')) document.querySelectorAll('.menu').forEach(m => m.hidden = true); });
+addEventListener('pointerdown', e => { if (!e.target.closest('.menu') && !e.target.closest('#bSign,#bStamp,#bSend')) document.querySelectorAll('.menu').forEach(m => m.hidden = true); });
 function buildSignMenu() {
   const m = $('#signMenu'); m.innerHTML = '';
   const list = loadSaved();
@@ -1465,6 +1498,8 @@ document.addEventListener('keydown', e => {
     if (k === 'o') { e.preventDefault(); $('#bOpen').click(); return; }
     if (k === 'f') { e.preventDefault(); $('#q').focus(); $('#q').select(); return; }
     if (typing) return;
+    if ((k === 'c' || k === 'x') && (document.activeElement === thumbsEl || S.selected.size) && !selected()) { e.preventDefault(); clipPages(k === 'x'); return; }
+    if (k === 'v' && PCLIP) { e.preventDefault(); pastePages(); return; }
     if (k === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
     if (k === 'y') { e.preventDefault(); redo(); return; }
     if (k === 'a' && document.activeElement === thumbsEl) { e.preventDefault(); S.selected = new Set(S.pages.map(p => p.id)); renderThumbs(); updateStatus(); return; }
@@ -1496,7 +1531,7 @@ document.addEventListener('keydown', e => {
     markDirty(); renderAnnots(s.p); selectAnnot(s.p, s.a);
   }
 });
-addEventListener('beforeunload', e => { if (S.dirty) { e.preventDefault(); e.returnValue = ''; } });
+addEventListener('beforeunload', e => { if (anyDirty()) { e.preventDefault(); e.returnValue = ''; } });
 
 // ---------- Google Drive (연결 앱) ----------
 const GCLIENT = '504587891767-m7vadrumbdpo7uv167q3kgu39484euvn.apps.googleusercontent.com';
@@ -1570,7 +1605,7 @@ async function openDriveIds(ids, rks, hint) {
       files.push(f);
     }
   } finally { busy(false); }
-  await importFiles(files, S.pages.length);
+  await openFilesAsTabs(files);
 }
 const qEsc = s => s.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 async function saveToDrive() {
@@ -1715,13 +1750,13 @@ if ('launchQueue' in window) {
     if (!params.files || !params.files.length) return;
     const files = [];
     for (const h of params.files) { try { const f = await h.getFile(); f._handle = h; files.push(f); } catch (e) { console.warn(e); } }
-    if (files.length) importFiles(files, S.pages.length);
+    if (files.length) openFilesAsTabs(files);
   });
 }
 if (!EMBED && !ANDROID && location.protocol === 'https:' && 'serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(e => console.warn(e));
 
 // ---------- 업데이트 ----------
-const APP_VERSION = '2026.10.19-1315';
+const APP_VERSION = '2026.10.19-1419';
 $('#stVer').textContent = 'v' + APP_VERSION + ' · 업데이트 확인';
 $('#verNow').textContent = 'v' + APP_VERSION;
 let lastUpdCheck = 0, updDismissed = '';
@@ -1743,7 +1778,7 @@ async function checkUpdate(manual) {
 }
 async function applyUpdate() {
   if (document.activeElement && document.activeElement.isContentEditable) document.activeElement.blur();
-  if (S.dirty && !confirm('저장하지 않은 변경이 있습니다.\n업데이트하면 편집기가 다시 열리면서 지금 변경이 사라집니다.\n\n[확인] 그래도 업데이트   [취소] 먼저 저장하기')) return;
+  if (anyDirty() && !confirm('저장하지 않은 변경이 있습니다.\n업데이트하면 편집기가 다시 열리면서 지금 변경이 사라집니다.\n\n[확인] 그래도 업데이트   [취소] 먼저 저장하기')) return;
   S.dirty = false;
   busy(true, '최신 버전으로 업데이트하는 중...');
   try { const reg = await navigator.serviceWorker?.getRegistration(); if (reg) await reg.update(); } catch {}
@@ -1769,7 +1804,7 @@ if (EMBED) {
     if (d.reqId && embedWait.has(d.reqId)) { const r = embedWait.get(d.reqId); embedWait.delete(d.reqId); r(d); return; }
     if (d.type === 'balhae-open' && Array.isArray(d.files)) {
       const files = d.files.map(f => new File([f.buffer], f.name || 'document.pdf', { type: f.type || 'application/pdf' }));
-      await importFiles(files, S.pages.length);
+      await openFilesAsTabs(files);
       if (files[0]) window.parent.postMessage({ type: 'balhae-title', title: files[0].name + ' - 발해 PDF' }, embedParent);
     }
     if (d.type === 'balhae-error') toast(d.message || 'PDF를 받지 못했습니다', 6000);
@@ -1827,7 +1862,7 @@ $('#bShareX').onclick = () => { $('#shareBar').hidden = true; };
     const meta = await metaRes.json(); const files = [];
     for (const m of meta) { const r = await c.match('/balhae-pdf/__shared__/' + m.i); if (r) files.push(new File([await r.blob()], m.name || 'shared.pdf', { type: m.type || 'application/pdf' })); }
     for (const k of await c.keys()) await c.delete(k);
-    if (files.length) await importFiles(files, S.pages.length);
+    if (files.length) await openFilesAsTabs(files);
   } catch (e) { console.warn(e); toast('공유받은 파일을 열지 못했습니다', 5000); }
 })();
 
@@ -1837,20 +1872,305 @@ if (ANDROID) {
   window.balhaeNativeCheck = async () => {
     let list = []; try { list = JSON.parse(window.BalhaeAndroid.takeFiles() || '[]'); } catch {}
     if (!list.length) return;
-    if (S.pages.length) {
-      if (!S.dirty || confirm('지금 문서를 닫고 새 파일을 열까요?\n[취소]를 누르면 지금 문서 뒤에 붙입니다.')) resetDoc();
-    }
     busy(true, '파일 받는 중...');
     const files = [];
     for (const f of list) { try { const r = await fetch(f.url, { cache: 'no-store' }); if (r.ok) files.push(new File([await r.blob()], f.name || 'document.pdf', { type: f.type || 'application/pdf' })); } catch (e) { console.warn(e); } }
     busy(false);
-    if (files.length) await importFiles(files, S.pages.length); else toast('파일을 열지 못했습니다', 5000);
+    if (files.length) await openFilesAsTabs(files); else toast('파일을 열지 못했습니다', 5000);
   };
   setTimeout(() => window.balhaeNativeCheck(), 300);
 }
 
+// ---------- 여러 문서(탭) · 문서 사이 쪽 옮기기 ----------
+var DOCS = [], ACTIVE = null, sideDrag = null, PCLIP = null, sideDocId = null, tabsRaf = 0;
+const DOC_FIELDS = ['pages', 'selected', 'currentId', 'undo', 'redo', 'dirty', 'hits', 'sel', 'zoom', 'single'];
+const sideSel = new Set();
+function blankState() { return { pages: [], selected: new Set(), currentId: null, undo: [], redo: [], dirty: false, hits: {}, sel: null, zoom: S.zoom || 1, single: false }; }
+function captureState() { const o = {}; for (const k of DOC_FIELDS) o[k] = S[k]; return o; }
+const docById = id => DOCS.find(d => d.id === id);
+const stateOf = d => d.id === ACTIVE ? S : d.st;
+function anyDirty() { return DOCS.some(d => { const st = stateOf(d); return st.dirty && st.pages.length; }); }
+function docTitle(d) {
+  const st = stateOf(d), srcs = [];
+  for (const p of st.pages) { const s = S.sources.get(p.src); if (s && !s.blank && !srcs.includes(s)) srcs.push(s); }
+  if (!srcs.length) return st.pages.length ? '새 문서' : '빈 문서';
+  const b = srcs[0].name.replace(/\.[^.]+$/, '');
+  return srcs.length > 1 ? b + ' 외 ' + (srcs.length - 1) + '건' : b;
+}
+function saveActive() { const d = docById(ACTIVE); if (d) d.st = captureState(); }
+function loadState(d) { ACTIVE = d.id; Object.assign(S, d.st || blankState()); d.st = null; if (typeof setSingle === 'function') setSingle(!!S.single); }
+function switchDoc(id) {
+  if (id === ACTIVE || !docById(id)) return;
+  if (document.activeElement && document.activeElement.isContentEditable) document.activeElement.blur();
+  saveActive(); loadState(docById(id));
+  $('#sp').hidden = true;
+  refresh(); renderTabs();
+  if (S.currentId) scrollToPage(S.currentId);
+}
+function newDoc(activate = true) {
+  const d = { id: nid('d'), st: blankState() };
+  DOCS.push(d);
+  if (activate) { saveActive(); loadState(d); refresh(); }
+  renderTabs();
+  return d;
+}
+function closeDoc(id) {
+  const d = docById(id); if (!d) return false;
+  const st = stateOf(d);
+  if (st.dirty && st.pages.length && !confirm('「' + docTitle(d) + '」에 저장하지 않은 변경이 있습니다. 저장하지 않고 닫을까요?')) return false;
+  const idx = DOCS.indexOf(d);
+  DOCS.splice(idx, 1);
+  if (id === ACTIVE) {
+    ACTIVE = null;
+    if (!DOCS.length) DOCS.push({ id: nid('d'), st: blankState() });
+    loadState(DOCS[Math.min(idx, DOCS.length - 1)]);
+    $('#sp').hidden = true;
+    refresh();
+  }
+  if (sideDocId === id) sideDocId = null;
+  gcSources(); renderTabs();
+  return true;
+}
+function gcSources() {
+  const keep = new Set(), texts = [];
+  for (const d of DOCS) { const st = stateOf(d); st.pages.forEach(p => keep.add(p.src)); texts.push(...st.undo, ...st.redo); }
+  if (PCLIP) PCLIP.pages.forEach(p => keep.add(p.src));
+  const big = texts.join('');
+  for (const [id, s] of [...S.sources]) {
+    if (keep.has(id) || big.includes('"' + id + '"')) continue;
+    try { s.pdf.destroy(); } catch {}
+    S.sources.delete(id);
+  }
+}
+async function openFilesAsTabs(files) {
+  for (const f of [...files]) {
+    if (S.pages.length) newDoc(true);
+    await importFiles([f], 0);
+    if (!S.pages.length && DOCS.length > 1) closeDoc(ACTIVE);
+  }
+  renderTabs();
+}
+function scheduleTabs() { if (tabsRaf) return; tabsRaf = requestAnimationFrame(() => { tabsRaf = 0; renderTabs(); }); }
+function renderTabs() {
+  const bar = $('#docTabs'); if (!bar || !ACTIVE) return;
+  bar.innerHTML = '';
+  for (const d of DOCS) {
+    const st = stateOf(d);
+    const el = document.createElement('div');
+    el.className = 'dtab' + (d.id === ACTIVE ? ' on' : ''); el.dataset.doc = d.id;
+    el.title = docTitle(d) + (d.id === ACTIVE ? '' : '  (쪽을 여기로 끌어 놓으면 이 문서로 이동, Ctrl 누르고 놓으면 복사)');
+    el.innerHTML = '<span class="t"></span><span class="n"></span><button class="x" title="이 문서 닫기">✕</button>';
+    el.querySelector('.t').textContent = (st.dirty && st.pages.length ? '● ' : '') + docTitle(d);
+    el.querySelector('.n').textContent = st.pages.length ? st.pages.length + '쪽' : '';
+    bar.appendChild(el);
+  }
+  const plus = document.createElement('button'); plus.id = 'bNewTab'; plus.textContent = '＋'; plus.title = '새 탭에서 파일 열기 (파일을 여기로 끌어 놓아도 새 탭으로 열림)';
+  bar.appendChild(plus);
+  renderSide();
+}
+const PCOPY = p => { const c = JSON.parse(JSON.stringify(p)); c.id = nid('p'); (c.annots || []).forEach(a => a.id = nid('a')); return c; };
+function pushUndoOn(st) { st.undo.push(JSON.stringify(st.pages)); if (st.undo.length > 100) st.undo.shift(); st.redo = []; }
+function transferPages(fromId, ids, toId, index, copy) {
+  const from = docById(fromId), to = docById(toId);
+  if (!from || !to || !ids || !ids.length) return;
+  const fs = stateOf(from), ts = stateOf(to), set = new Set(ids);
+  const picked = fs.pages.filter(p => set.has(p.id));
+  if (!picked.length) return;
+  if (fromId === toId) { if (fromId === ACTIVE) { if (copy) { pushUndo(); const at = index == null ? S.pages.length : index; S.pages.splice(at, 0, ...picked.map(PCOPY)); markDirty(); refresh(); } else movePages(ids, index == null ? S.pages.length : index); } return; }
+  const clones = picked.map(PCOPY);
+  const wasEmpty = !ts.pages.length;
+  pushUndoOn(ts);
+  const at = index == null ? ts.pages.length : Math.max(0, Math.min(index, ts.pages.length));
+  ts.pages.splice(at, 0, ...clones); ts.dirty = true;
+  if (wasEmpty) { ts.currentId = clones[0].id; ts.zoom = fitZoom(clones[0], 1.6); }
+  if (!copy) {
+    pushUndoOn(fs);
+    fs.pages = fs.pages.filter(p => !set.has(p.id)); fs.selected = new Set(); fs.dirty = true;
+    if (!fs.pages.some(p => p.id === fs.currentId)) fs.currentId = fs.pages[0] ? fs.pages[0].id : null;
+  }
+  sideSel.clear();
+  if (fromId === ACTIVE || toId === ACTIVE) refresh();
+  renderTabs();
+  toast(picked.length + '쪽을 「' + docTitle(to) + '」(으)로 ' + (copy ? '복사' : '이동') + '했습니다. 각 문서에서 Ctrl+Z로 되돌릴 수 있습니다.', 4000);
+}
+function sendTo(target, copy) {
+  const ids = targetIds(); if (!ids.length) return toast('보낼 쪽을 왼쪽 목록에서 선택하세요');
+  let d = target === 'new' ? newDoc(false) : docById(target);
+  transferPages(ACTIVE, ids, d.id, null, copy);
+}
+function clipPages(cut) {
+  const ids = targetIds(); if (!ids.length) return;
+  const set = new Set(ids);
+  PCLIP = { pages: S.pages.filter(p => set.has(p.id)).map(p => JSON.parse(JSON.stringify(p))) };
+  if (cut) { deletePages(ids); toast(ids.length + '쪽을 잘라냈습니다. 원하는 문서(탭)에서 Ctrl+V로 붙여넣으세요.', 4000); }
+  else toast(ids.length + '쪽을 복사했습니다. 원하는 문서(탭)에서 Ctrl+V로 붙여넣으세요.', 4000);
+}
+function pastePages() {
+  if (!PCLIP || !PCLIP.pages.length) return;
+  const wasEmpty = !S.pages.length;
+  pushUndo();
+  const clones = PCLIP.pages.map(PCOPY);
+  const at = wasEmpty ? 0 : curIndex() + 1;
+  S.pages.splice(at, 0, ...clones);
+  S.selected = new Set(clones.map(p => p.id)); S.currentId = clones[0].id;
+  if (wasEmpty) S.zoom = fitZoom(clones[0], 1.6);
+  markDirty(); refresh(); scrollToPage(clones[0].id);
+  toast(clones.length + '쪽을 붙여넣었습니다');
+}
+// 탭 막대: 클릭·닫기·끌어 놓기
+const tabBar = $('#docTabs');
+tabBar.addEventListener('click', e => {
+  if (e.target.id === 'bNewTab') { $('#fOpen').click(); return; }
+  const t = e.target.closest('.dtab'); if (!t) return;
+  if (e.target.closest('.x')) { closeDoc(t.dataset.doc); return; }
+  switchDoc(t.dataset.doc);
+});
+tabBar.addEventListener('auxclick', e => { const t = e.target.closest('.dtab'); if (t && e.button === 1) closeDoc(t.dataset.doc); });
+tabBar.addEventListener('dragover', e => {
+  const isFiles = e.dataTransfer.types.includes('Files');
+  const t = e.target.closest('.dtab');
+  if (!isFiles && !((dragIds || sideDrag) && t)) return;
+  e.preventDefault(); e.stopPropagation();
+  e.dataTransfer.dropEffect = isFiles || e.ctrlKey || e.altKey ? 'copy' : 'move';
+  tabBar.querySelectorAll('.dtab.dropok').forEach(x => { if (x !== t) x.classList.remove('dropok'); });
+  if (t && !isFiles) t.classList.add('dropok');
+});
+tabBar.addEventListener('dragleave', e => { if (!tabBar.contains(e.relatedTarget)) tabBar.querySelectorAll('.dtab.dropok').forEach(x => x.classList.remove('dropok')); });
+tabBar.addEventListener('drop', e => {
+  e.preventDefault(); e.stopPropagation(); document.body.classList.remove('dragover');
+  tabBar.querySelectorAll('.dtab.dropok').forEach(x => x.classList.remove('dropok'));
+  if (e.dataTransfer.files.length) { openFilesAsTabs(e.dataTransfer.files); return; }
+  const t = e.target.closest('.dtab'); if (!t) return;
+  const copy = e.ctrlKey || e.altKey;
+  if (sideDrag) { const sd = sideDrag; sideDrag = null; transferPages(sd.from, sd.ids, t.dataset.doc, null, copy); }
+  else if (dragIds) { const ids = dragIds; dragIds = null; transferPages(ACTIVE, ids, t.dataset.doc, null, copy); }
+});
+// 「다른 문서로 ▾」 메뉴
+$('#bSend').onclick = e => {
+  const m = $('#sendMenu'); m.innerHTML = '';
+  const ids = targetIds();
+  const head = document.createElement('div'); head.style.cssText = 'font-size:12px;color:#5b6679;padding:4px 8px';
+  head.textContent = ids.length ? '선택한 ' + ids.length + '쪽을…' : '먼저 왼쪽 목록에서 쪽을 고르세요 (Ctrl·Shift+클릭으로 여러 쪽)';
+  m.appendChild(head);
+  if (ids.length) {
+    const others = DOCS.filter(d => d.id !== ACTIVE);
+    for (const copy of [false, true]) {
+      m.appendChild(document.createElement('hr'));
+      for (const d of others) { const b = document.createElement('button'); b.textContent = (copy ? '복사 → ' : '이동 → ') + docTitle(d) + ' (끝에)'; b.onclick = () => { m.hidden = true; sendTo(d.id, copy); }; m.appendChild(b); }
+      const nb = document.createElement('button'); nb.textContent = (copy ? '복사 → ' : '이동 → ') + '새 문서'; nb.onclick = () => { m.hidden = true; sendTo('new', copy); }; m.appendChild(nb);
+    }
+    m.appendChild(document.createElement('hr'));
+    const cb = document.createElement('button'); cb.textContent = '복사 (Ctrl+C) — 다른 탭에서 Ctrl+V'; cb.onclick = () => { m.hidden = true; clipPages(false); }; m.appendChild(cb);
+    const xb = document.createElement('button'); xb.textContent = '잘라내기 (Ctrl+X)'; xb.onclick = () => { m.hidden = true; clipPages(true); }; m.appendChild(xb);
+  }
+  if (PCLIP) { const pb = document.createElement('button'); pb.textContent = '붙여넣기 (Ctrl+V) — ' + PCLIP.pages.length + '쪽, 현재 쪽 뒤에'; pb.onclick = () => { m.hidden = true; pastePages(); }; m.appendChild(pb); }
+  openMenu(m, e.currentTarget);
+};
+// 나란히 보기
+const sideEl = $('#side'), sideList = $('#sideList');
+let sideIO = null, sideSig = '';
+function sideDoc() {
+  let d = docById(sideDocId);
+  if (!d || d.id === ACTIVE) { d = DOCS.find(x => x.id !== ACTIVE) || null; sideDocId = d ? d.id : null; }
+  return d;
+}
+function renderSide(force) {
+  if (sideEl.hidden) return;
+  const d = sideDoc();
+  const opts = DOCS.filter(x => x.id !== ACTIVE).map(x => x.id + ':' + docTitle(x)).join('|');
+  const sigBase = opts + '#' + (d ? stateOf(d).pages.map(p => p.id + p.rot).join(',') : '') + '#' + [...sideSel].join(',');
+  if (!force && sigBase === sideSig) return;
+  sideSig = sigBase;
+  const sel = $('#sideSel'); sel.innerHTML = '';
+  for (const x of DOCS.filter(x => x.id !== ACTIVE)) { const o = document.createElement('option'); o.value = x.id; o.textContent = docTitle(x) + ' (' + stateOf(x).pages.length + '쪽)'; if (d && x.id === d.id) o.selected = true; sel.appendChild(o); }
+  sel.disabled = !d;
+  sideList.innerHTML = '';
+  if (sideIO) sideIO.disconnect();
+  if (!d) { sideList.innerHTML = '<div class="empty">옆에 띄울 다른 문서가 없습니다.<br>위의 [파일 열기]로 다른 PDF를 여세요.</div>'; return; }
+  const st = stateOf(d);
+  if (!st.pages.length) { sideList.innerHTML = '<div class="empty">빈 문서입니다.<br>왼쪽 쪽을 여기로 끌어 놓으면 이 문서로 옮겨집니다.</div>'; }
+  sideIO = new IntersectionObserver(es => { for (const en of es) if (en.isIntersecting) { const p = st.pages.find(q => q.id === en.target.dataset.id); if (p) drawInto(en.target.querySelector('.tc'), p, 130 / dims(p).w * (window.devicePixelRatio || 1), thumbCache, 600, false); } }, { root: sideList, rootMargin: '300px 0px' });
+  st.pages.forEach((p, i) => {
+    const { w, h } = dims(p);
+    const el = document.createElement('div'); el.className = 'sthumb' + (sideSel.has(p.id) ? ' sel' : ''); el.dataset.id = p.id; el.draggable = true;
+    el.title = '끌어서 왼쪽 목록이나 탭에 놓으면 이동 (Ctrl 누르고 놓으면 복사)';
+    el.innerHTML = '<div class="tc" style="aspect-ratio:' + w + ' / ' + h + '"></div><div class="tl">' + (i + 1) + '</div>';
+    sideList.appendChild(el); sideIO.observe(el);
+  });
+}
+let sideLast = null;
+sideList.addEventListener('click', e => {
+  const t = e.target.closest('.sthumb'); if (!t) return;
+  const d = sideDoc(); const st = stateOf(d); const id = t.dataset.id;
+  if (e.shiftKey && sideLast) { const a = st.pages.findIndex(p => p.id === sideLast), b = st.pages.findIndex(p => p.id === id); const [lo, hi] = a < b ? [a, b] : [b, a]; if (!(e.ctrlKey || e.metaKey)) sideSel.clear(); for (let i = lo; i <= hi; i++) sideSel.add(st.pages[i].id); }
+  else if (e.ctrlKey || e.metaKey) { sideSel.has(id) ? sideSel.delete(id) : sideSel.add(id); sideLast = id; }
+  else { sideSel.clear(); sideSel.add(id); sideLast = id; }
+  sideList.querySelectorAll('.sthumb').forEach(el => el.classList.toggle('sel', sideSel.has(el.dataset.id)));
+  sideSig = '';
+});
+sideList.addEventListener('dragstart', e => {
+  const t = e.target.closest('.sthumb'); if (!t) return;
+  const d = sideDoc(); const st = stateOf(d); const id = t.dataset.id;
+  const ids = sideSel.has(id) ? st.pages.filter(p => sideSel.has(p.id)).map(p => p.id) : [id];
+  sideDrag = { from: d.id, ids };
+  e.dataTransfer.setData('text/x-balhae-pages', ids.join(',')); e.dataTransfer.effectAllowed = 'copyMove';
+});
+sideList.addEventListener('dragend', () => { sideDrag = null; showSideLine(-1); });
+function sideInsertIndex(x, y) {
+  const els = [...sideList.querySelectorAll('.sthumb')];
+  for (let i = 0; i < els.length; i++) { const r = els[i].getBoundingClientRect(); if (y < r.top + r.height / 2) return i; }
+  return els.length;
+}
+function showSideLine(idx) {
+  let line = sideList.querySelector('.dropline');
+  if (idx < 0) { if (line) line.remove(); return; }
+  const els = sideList.querySelectorAll('.sthumb');
+  if (!line) { line = document.createElement('div'); line.className = 'dropline'; sideList.appendChild(line); }
+  const host = sideList.getBoundingClientRect();
+  if (!els.length) { line.style.cssText = 'left:20px;right:20px;top:12px;height:4px;width:auto'; return; }
+  const ref = els[Math.min(idx, els.length - 1)].getBoundingClientRect();
+  const y = idx < els.length ? ref.top - 4 : ref.bottom + 1;
+  line.style.cssText = 'left:' + (ref.left - host.left + 6) + 'px;width:' + (ref.width - 12) + 'px;height:4px;top:' + (y - host.top + sideList.scrollTop) + 'px';
+}
+sideList.addEventListener('dragover', e => {
+  if (!dragIds || !sideDoc()) return;
+  e.preventDefault(); e.dataTransfer.dropEffect = e.ctrlKey || e.altKey ? 'copy' : 'move';
+  showSideLine(sideInsertIndex(e.clientX, e.clientY));
+});
+sideList.addEventListener('dragleave', e => { if (!sideList.contains(e.relatedTarget)) showSideLine(-1); });
+sideList.addEventListener('drop', e => {
+  e.preventDefault(); e.stopPropagation(); showSideLine(-1);
+  const d = sideDoc(); if (!d || !dragIds) return;
+  const ids = dragIds; dragIds = null;
+  transferPages(ACTIVE, ids, d.id, sideInsertIndex(e.clientX, e.clientY), e.ctrlKey || e.altKey);
+});
+$('#sideSel').onchange = e => { sideDocId = e.target.value; sideSel.clear(); renderSide(true); };
+function sideBring(copy) {
+  const d = sideDoc(); if (!d) return;
+  const st = stateOf(d); const ids = st.pages.filter(p => sideSel.has(p.id)).map(p => p.id);
+  if (!ids.length) return toast('오른쪽 목록에서 가져올 쪽을 고르세요 (Ctrl·Shift+클릭으로 여러 쪽)');
+  transferPages(d.id, ids, ACTIVE, S.pages.length ? curIndex() + 1 : 0, copy);
+}
+$('#sideMove').onclick = () => sideBring(false);
+$('#sideCopy').onclick = () => sideBring(true);
+$('#sideClose').onclick = () => { sideEl.hidden = true; $('#bSide').classList.remove('on'); };
+$('#sideOpen').onclick = () => $('#fSide').click();
+$('#fSide').onchange = async e => {
+  const files = [...e.target.files]; e.target.value = ''; if (!files.length) return;
+  const back = ACTIVE;
+  const d = newDoc(true);
+  for (const f of files) await importFiles([f], S.pages.length);
+  if (!S.pages.length) { closeDoc(d.id); return; }
+  sideDocId = d.id; switchDoc(back); sideSel.clear(); renderSide(true);
+};
+$('#bSide').onclick = () => {
+  sideEl.hidden = !sideEl.hidden; $('#bSide').classList.toggle('on', !sideEl.hidden);
+  if (!sideEl.hidden) { sideSig = ''; renderSide(true); if (!sideDoc()) toast('옆에 띄울 다른 문서가 없습니다. 오른쪽 [파일 열기]로 여세요.', 4000); }
+};
+DOCS.push({ id: nid('d'), st: null }); ACTIVE = DOCS[0].id; renderTabs();
+
 setTool('select'); updateStatus();
-window.__balhaePdf = { S, buildPdf, importFiles, openDriveIds };
+window.__balhaePdf = { S, buildPdf, importFiles, openDriveIds, openFilesAsTabs, transferPages, switchDoc, get DOCS() { return DOCS; }, get ACTIVE() { return ACTIVE; }, stateOf: id => stateOf(docById(id)) };
 })();
 </script>
 </body>
