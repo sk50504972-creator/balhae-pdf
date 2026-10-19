@@ -1531,15 +1531,40 @@ async function dfetch(url, opt = {}, rk) {
   if (!r.ok) { let m = ''; try { m = (await r.json()).error.message; } catch {} throw new Error(`드라이브 오류 ${r.status} ${m}`); }
   return r;
 }
+async function fetchRetry(urls, opt, rk, label) {
+  let last = null;
+  for (let round = 0; round < 2; round++) {
+    for (const u of urls) {
+      try { return await dfetch(u, opt, rk); }
+      catch (e) {
+        last = e;
+        if (/드라이브 오류 401/.test(e.message)) { gToken = null; gExp = 0; try { localStorage.removeItem('balhae-gtok'); } catch {} throw e; }
+        if (/드라이브 오류 (403|404)/.test(e.message)) throw e;
+      }
+    }
+    await new Promise(r => setTimeout(r, 1200));
+  }
+  const m = last && last.message || '';
+  throw new Error(/fetch|network|Load failed/i.test(m) ? label + ' 연결이 끊겼습니다. 인터넷 연결을 확인하고 [다시 시도]를 누르세요.' : m);
+}
 async function openDriveIds(ids, rks, hint) {
   await getToken(hint);
   const files = [];
   try {
     for (let i = 0; i < ids.length; i++) {
-      const id = ids[i]; busy(true, `드라이브에서 받는 중... ${i + 1}/${ids.length}`);
-      const rk = rks && rks[id] ? `${id}/${rks[id]}` : undefined;
-      const meta = await (await dfetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(id)}?fields=id,name,mimeType,parents&supportsAllDrives=true`, {}, rk)).json();
-      const blob = await (await dfetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(id)}?alt=media&supportsAllDrives=true`, {}, rk)).blob();
+      const id = encodeURIComponent(ids[i]); busy(true, `드라이브에서 받는 중... ${i + 1}/${ids.length}`);
+      const rk = rks && rks[ids[i]] ? `${ids[i]}/${rks[ids[i]]}` : undefined;
+      const meta = await (await fetchRetry([
+        `https://www.googleapis.com/drive/v3/files/${id}?fields=id,name,mimeType,parents,size&supportsAllDrives=true`,
+        `https://content.googleapis.com/drive/v3/files/${id}?fields=id,name,mimeType,parents,size&supportsAllDrives=true`,
+      ], {}, rk, '파일 정보를 받는 중')).json();
+      if (/^application\/vnd\.google-apps/.test(meta.mimeType || '')) throw new Error('구글 문서·시트는 열 수 없습니다. PDF로 내려받은 뒤 여세요.');
+      if (meta.size) $('#busyText').textContent = `드라이브에서 받는 중... ${i + 1}/${ids.length} (${(meta.size / 1048576).toFixed(1)}MB)`;
+      const blob = await (await fetchRetry([
+        `https://www.googleapis.com/drive/v3/files/${id}?alt=media&supportsAllDrives=true`,
+        `https://content.googleapis.com/drive/v3/files/${id}?alt=media&supportsAllDrives=true`,
+        `https://www.googleapis.com/drive/v2/files/${id}?alt=media&supportsAllDrives=true`,
+      ], {}, rk, '파일을 내려받는 중')).blob();
       const f = new File([blob], meta.name, { type: meta.mimeType || blob.type });
       f._drive = { id: meta.id, name: meta.name, parents: meta.parents || [] };
       files.push(f);
@@ -1598,6 +1623,7 @@ function showDriveGate(pend, msg) {
   loadGis().catch(() => {});
   $('#driveGateMsg').textContent = msg || `드라이브에서 고른 파일 ${pend.ids.length}개를 엽니다. 아래 버튼을 누르고 구글 계정을 확인해 주세요.`;
   $('#driveGate').hidden = false;
+  $('#bDriveOpen').textContent = msg ? '다시 시도' : '드라이브 파일 열기';
   $('#bDriveOpen').onclick = async () => {
     $('#driveGate').hidden = true;
     try { await openDriveIds(pend.ids, pend.resourceKeys, pend.userId); sessionStorage.removeItem('balhae-drive-open'); }
@@ -1629,7 +1655,10 @@ function showDriveGate(pend, msg) {
   if (!pend.ids || !pend.ids.length) { sessionStorage.removeItem('balhae-drive-open'); toast('구글 문서·시트 파일은 열 수 없습니다. PDF나 사진을 고르세요.', 5000); return; }
   if (gToken && Date.now() < gExp - 60000) {
     sessionStorage.removeItem('balhae-drive-open'); sessionStorage.removeItem('balhae-drive-tried');
-    openDriveIds(pend.ids, pend.resourceKeys, pend.userId).catch(e => showDriveGate(pend, '열지 못했습니다: ' + e.message));
+    openDriveIds(pend.ids, pend.resourceKeys, pend.userId).catch(e => {
+      if (/401/.test(e.message) && !sessionStorage.getItem('balhae-drive-tried')) { sessionStorage.setItem('balhae-drive-open', JSON.stringify(pend)); sessionStorage.setItem('balhae-drive-tried', '1'); redirectAuth(pend.userId, true); return; }
+      showDriveGate(pend, '열지 못했습니다: ' + e.message);
+    });
     return;
   }
   busy(true, '구글 드라이브 파일을 여는 중...');
@@ -1692,7 +1721,7 @@ if ('launchQueue' in window) {
 if (!EMBED && !ANDROID && location.protocol === 'https:' && 'serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(e => console.warn(e));
 
 // ---------- 업데이트 ----------
-const APP_VERSION = '2026.10.14-1511';
+const APP_VERSION = '2026.10.19-1315';
 $('#stVer').textContent = 'v' + APP_VERSION + ' · 업데이트 확인';
 $('#verNow').textContent = 'v' + APP_VERSION;
 let lastUpdCheck = 0, updDismissed = '';
@@ -1821,7 +1850,7 @@ if (ANDROID) {
 }
 
 setTool('select'); updateStatus();
-window.__balhaePdf = { S, buildPdf, importFiles };
+window.__balhaePdf = { S, buildPdf, importFiles, openDriveIds };
 })();
 </script>
 </body>
