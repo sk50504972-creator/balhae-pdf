@@ -178,11 +178,12 @@ footer #hint{margin-left:12px}
       <button id="bOpen" title="새로 열기 (Ctrl+O)">열기</button>
       <button id="bClose" title="지금 열려 있는 문서 닫기">닫기</button>
       <button id="bAdd" title="현재 쪽 뒤에 PDF·사진을 끼워 넣기 (합치기)">파일 추가·합치기</button>
-      <button id="bSave" class="primary" title="저장 (Ctrl+S)">저장</button>
+      <button id="bSave" class="primary" title="지금 작업 중인 파일에 저장 (Ctrl+S)">저장</button>
+      <button id="bSaveAs" title="다른 이름(새 파일)으로 저장 (Ctrl+Shift+S)">다른 이름으로 저장</button>
       <button id="bSaveSel" title="왼쪽에서 선택한 쪽만 새 PDF로 저장">선택 쪽만 저장</button>
       <button id="bPrint" title="인쇄용으로 열기">인쇄</button>
       <button id="bShare" hidden title="카카오톡·메일·드라이브 등으로 보내기">공유</button>
-      <button id="bDriveSave" hidden title="원본이 있던 구글 드라이브 폴더에 새 파일로 저장 (원본은 그대로)">드라이브에 저장</button>
+      <button id="bDriveSave" hidden title="원본이 있던 구글 드라이브 폴더에 _수정N 새 파일로 저장 (원본은 그대로)">드라이브에 새 파일로</button>
     </div>
     <div class="grp">
       <button id="bUndo" title="실행 취소 (Ctrl+Z)">↶ 취소</button>
@@ -507,6 +508,8 @@ function busy(on, text) { $('#busy').hidden = !on; if (text) $('#busyText').text
 function markDirty() { S.dirty = true; updateStatus(); }
 function updateStatus() {
   const n = S.pages.length;
+  const bsv = document.getElementById('bSave');
+  if (bsv) bsv.title = S.target ? `「${S.target.name}」에 저장 (${S.target.kind === 'drive' ? '구글 드라이브 원본' : '원래 위치'}, Ctrl+S)` : '저장할 위치를 골라 저장 (Ctrl+S). 저장한 뒤에는 그 파일에 바로 저장';
   $('#stPages').textContent = n ? `총 ${n}쪽` : '문서 없음';
   $('#stSel').textContent = S.selected.size ? `선택 ${S.selected.size}쪽` : '';
   const files = new Set(S.pages.map(p => S.sources.get(p.src)).filter(s => !s.blank).map(s => s.id));
@@ -1171,13 +1174,35 @@ thumbsEl.addEventListener('drop', e => {
 // files dropped anywhere else -> append
 addEventListener('dragover', e => { if (e.dataTransfer.types.includes('Files')) { e.preventDefault(); document.body.classList.add('dragover'); } });
 addEventListener('dragleave', e => { if (!e.relatedTarget) document.body.classList.remove('dragover'); });
-addEventListener('drop', e => { e.preventDefault(); document.body.classList.remove('dragover'); if (e.dataTransfer.files.length) importFiles(e.dataTransfer.files, S.pages.length); });
+addEventListener('drop', e => { e.preventDefault(); document.body.classList.remove('dragover'); if (!e.dataTransfer.files.length) return; if (!S.pages.length) dropFiles(e.dataTransfer).then(openFilesAsTabs); else importFiles(e.dataTransfer.files, S.pages.length); });
 
 // ---------- open / add ----------
-$('#bOpen').onclick = () => $('#fOpen').click();
+const PICK_TYPES = [{ description: 'PDF·사진', accept: { 'application/pdf': ['.pdf'], 'image/*': ['.png', '.jpg', '.jpeg', '.webp', '.gif', '.bmp'] } }];
+$('#bOpen').onclick = async () => {
+  if (window.showOpenFilePicker && !EMBED && !ANDROID) {
+    let hs;
+    try { hs = await showOpenFilePicker({ multiple: true, types: PICK_TYPES, id: 'balhae-open' }); }
+    catch (e) { if (e.name === 'AbortError') return; hs = null; }
+    if (hs) {
+      const files = [];
+      for (const h of hs) { try { const f = await h.getFile(); f._handle = h; files.push(f); } catch (e) { console.warn(e); } }
+      if (files.length) await openFilesAsTabs(files);
+      return;
+    }
+  }
+  $('#fOpen').click();
+};
+// 끌어 놓은 파일도 원래 위치를 기억한다 (저장 시 그 파일에 저장)
+function dropFiles(dt) {
+  const files = [...dt.files];
+  const items = [...(dt.items || [])].filter(it => it.kind === 'file');
+  if (!items.length || !items[0].getAsFileSystemHandle) return Promise.resolve(files);
+  const hp = items.map(it => it.getAsFileSystemHandle().catch(() => null));
+  return Promise.all(hp).then(hs => { files.forEach((f, i) => { const h = hs[i]; if (h && h.kind === 'file' && h.name === f.name) f._handle = h; }); return files; });
+}
 function resetDoc() {
   if (document.activeElement && document.activeElement.isContentEditable) document.activeElement.blur();
-  S.pages = []; S.selected = new Set(); S.undo = []; S.redo = []; S.sel = null; S.hits = {}; S.currentId = null; S.dirty = false;
+  S.pages = []; S.selected = new Set(); S.undo = []; S.redo = []; S.sel = null; S.hits = {}; S.currentId = null; S.dirty = false; S.target = null;
   $('#sp').hidden = true; $('#q').value = '';
   refresh(); if (typeof gcSources === 'function') gcSources();
 }
@@ -1430,9 +1455,49 @@ function askRaster(list) {
   const ok = confirm(`마스킹한 쪽이 ${mp.length}쪽 있습니다.\n\n[확인] 그 쪽을 이미지로 바꿔 가려진 글자를 완전히 지웁니다 (권장, 개인정보 보호)\n[취소] 검정 박스만 덮습니다 (아래 글자가 복사·검색될 수 있음)`);
   return ok ? new Set(mp.map(p => p.id)) : new Set();
 }
-async function savePdf(mode) {
+// 작업 중인 파일(열었던 원래 파일)에 그대로 저장
+async function saveInPlace() {
+  const t = S.target;
+  if (t.kind === 'file') {
+    let perm = 'prompt';
+    try { perm = await t.handle.queryPermission({ mode: 'readwrite' }); if (perm !== 'granted') perm = await t.handle.requestPermission({ mode: 'readwrite' }); } catch (e) { console.warn(e); perm = 'denied'; }
+    if (perm !== 'granted') { toast('원래 파일에 쓰기 권한이 없어 저장 위치를 고릅니다', 4000); return false; }
+  } else if (t.kind === 'drive') {
+    try { await getToken(); } catch (e) { toast(e.message, 5000); return true; }
+  }
+  const raster = askRaster(S.pages);
+  busy(true, 'PDF 만드는 중...');
+  try {
+    const bytes = await buildPdf(S.pages, raster, (i, n) => $('#busyText').textContent = `PDF 만드는 중... ${i}/${n}쪽`);
+    if (t.kind === 'file') {
+      const w = await t.handle.createWritable(); await w.write(bytes); await w.close();
+    } else if (t.kind === 'drive') {
+      $('#busyText').textContent = '드라이브 원본 파일에 저장하는 중...';
+      const init = await dfetch(`https://www.googleapis.com/upload/drive/v3/files/${t.id}?uploadType=resumable&supportsAllDrives=true`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json; charset=UTF-8', 'X-Upload-Content-Type': 'application/pdf' }, body: '{}',
+      });
+      const loc = init.headers.get('Location');
+      if (!loc) throw new Error('업로드 주소를 받지 못했습니다');
+      const put = await fetch(loc, { method: 'PUT', body: new Blob([bytes], { type: 'application/pdf' }) });
+      if (!put.ok) throw new Error('업로드 실패 ' + put.status);
+    } else if (t.kind === 'embed') {
+      const buf = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+      const r = await embedAsk({ type: 'balhae-write', id: t.id, buffer: buf }, [buf]);
+      if (!r.ok) throw new Error(r.message || '파일을 쓰지 못했습니다');
+    }
+    S.dirty = false; updateStatus();
+    toast(`작업 중인 파일에 저장했습니다: ${t.name}${t.kind === 'drive' ? ' (구글 드라이브, 이전 판은 드라이브 「버전 관리」에 남음)' : ''} (${(bytes.length / 1048576).toFixed(1)}MB)`, 5000);
+  } catch (e) {
+    console.error(e);
+    if (t.kind === 'drive' && confirm('드라이브 원본 파일에 저장하지 못했습니다: ' + (e.message || e) + '\n\n같은 폴더에 새 파일(_수정N)로 저장할까요?')) { busy(false); saveToDrive(); }
+    else alert('저장하지 못했습니다: ' + (e.message || e));
+  } finally { busy(false); }
+  return true;
+}
+async function savePdf(mode, asNew) {
   if (document.activeElement && document.activeElement.isContentEditable) document.activeElement.blur();
   if (!S.pages.length) return toast('열린 문서가 없습니다');
+  if (mode === 'all' && !asNew && S.target && !ANDROID) { if (await saveInPlace()) return; }
   const list = mode === 'sel' ? S.pages.filter(p => S.selected.has(p.id)) : S.pages;
   if (!list.length) return toast('저장할 쪽을 왼쪽 목록에서 선택하세요 (Ctrl·Shift+클릭)');
   const name = suggestName(mode);
@@ -1469,13 +1534,15 @@ async function savePdf(mode) {
       const r = await embedAsk({ type: 'balhae-write', id: handle.id, buffer: buf }, [buf]);
       if (!r.ok) throw new Error(r.message || '파일을 쓰지 못했습니다');
       toast(`저장했습니다: ${handle.name} (${(bytes.length / 1048576).toFixed(1)}MB)`, 4000);
-    } else if (handle) { const w = await handle.createWritable(); await w.write(bytes); await w.close(); toast(`저장했습니다: ${handle.name} (${(bytes.length / 1048576).toFixed(1)}MB)`, 4000); }
+      if (mode !== 'sel') S.target = { kind: 'embed', id: handle.id, name: handle.name };
+    } else if (handle) { const w = await handle.createWritable(); await w.write(bytes); await w.close(); toast(`저장했습니다: ${handle.name} (${(bytes.length / 1048576).toFixed(1)}MB)`, 4000); if (mode !== 'sel') S.target = { kind: 'file', handle, name: handle.name }; }
     else download(bytes, name);
     if (mode !== 'sel') { S.dirty = false; updateStatus(); }
   } catch (e) { console.error(e); alert('저장하지 못했습니다: ' + (e.message || e)); }
   finally { busy(false); }
 }
 $('#bSave').onclick = () => savePdf('all');
+$('#bSaveAs').onclick = () => savePdf('all', true);
 $('#bSaveSel').onclick = () => savePdf('sel');
 $('#bPrint').onclick = async () => {
   if (!S.pages.length) return toast('열린 문서가 없습니다');
@@ -1494,7 +1561,7 @@ document.addEventListener('keydown', e => {
   const tg = e.target; const typing = tg.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(tg.tagName);
   const k = e.key.toLowerCase();
   if (e.ctrlKey || e.metaKey) {
-    if (k === 's') { e.preventDefault(); savePdf('all'); return; }
+    if (k === 's') { e.preventDefault(); savePdf('all', e.shiftKey); return; }
     if (k === 'o') { e.preventDefault(); $('#bOpen').click(); return; }
     if (k === 'f') { e.preventDefault(); $('#q').focus(); $('#q').select(); return; }
     if (typing) return;
@@ -1756,7 +1823,7 @@ if ('launchQueue' in window) {
 if (!EMBED && !ANDROID && location.protocol === 'https:' && 'serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(e => console.warn(e));
 
 // ---------- 업데이트 ----------
-const APP_VERSION = '2026.10.19-1419';
+const APP_VERSION = '2026.11.10-0929';
 $('#stVer').textContent = 'v' + APP_VERSION + ' · 업데이트 확인';
 $('#verNow').textContent = 'v' + APP_VERSION;
 let lastUpdCheck = 0, updDismissed = '';
@@ -1883,9 +1950,9 @@ if (ANDROID) {
 
 // ---------- 여러 문서(탭) · 문서 사이 쪽 옮기기 ----------
 var DOCS = [], ACTIVE = null, sideDrag = null, PCLIP = null, sideDocId = null, tabsRaf = 0;
-const DOC_FIELDS = ['pages', 'selected', 'currentId', 'undo', 'redo', 'dirty', 'hits', 'sel', 'zoom', 'single'];
+const DOC_FIELDS = ['pages', 'selected', 'currentId', 'undo', 'redo', 'dirty', 'hits', 'sel', 'zoom', 'single', 'target'];
 const sideSel = new Set();
-function blankState() { return { pages: [], selected: new Set(), currentId: null, undo: [], redo: [], dirty: false, hits: {}, sel: null, zoom: S.zoom || 1, single: false }; }
+function blankState() { return { pages: [], selected: new Set(), currentId: null, undo: [], redo: [], dirty: false, hits: {}, sel: null, zoom: S.zoom || 1, single: false, target: null }; }
 function captureState() { const o = {}; for (const k of DOC_FIELDS) o[k] = S[k]; return o; }
 const docById = id => DOCS.find(d => d.id === id);
 const stateOf = d => d.id === ACTIVE ? S : d.st;
@@ -1942,11 +2009,19 @@ function gcSources() {
     S.sources.delete(id);
   }
 }
+function targetOf(f) {
+  const pdf = /\.pdf$/i.test(f.name) || f.type === 'application/pdf';
+  if (!pdf) return null;
+  if (f._handle) return { kind: 'file', handle: f._handle, name: f.name };
+  if (f._drive) return { kind: 'drive', id: f._drive.id, name: f._drive.name || f.name, parents: f._drive.parents || [] };
+  return null;
+}
 async function openFilesAsTabs(files) {
   for (const f of [...files]) {
     if (S.pages.length) newDoc(true);
     await importFiles([f], 0);
     if (!S.pages.length && DOCS.length > 1) closeDoc(ACTIVE);
+    else if (S.pages.length) { S.target = targetOf(f); updateStatus(); }
   }
   renderTabs();
 }
@@ -2039,7 +2114,7 @@ tabBar.addEventListener('dragleave', e => { if (!tabBar.contains(e.relatedTarget
 tabBar.addEventListener('drop', e => {
   e.preventDefault(); e.stopPropagation(); document.body.classList.remove('dragover');
   tabBar.querySelectorAll('.dtab.dropok').forEach(x => x.classList.remove('dropok'));
-  if (e.dataTransfer.files.length) { openFilesAsTabs(e.dataTransfer.files); return; }
+  if (e.dataTransfer.files.length) { dropFiles(e.dataTransfer).then(openFilesAsTabs); return; }
   const t = e.target.closest('.dtab'); if (!t) return;
   const copy = e.ctrlKey || e.altKey;
   if (sideDrag) { const sd = sideDrag; sideDrag = null; transferPages(sd.from, sd.ids, t.dataset.doc, null, copy); }
