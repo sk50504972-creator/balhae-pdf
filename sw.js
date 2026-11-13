@@ -1,4 +1,4 @@
-const C = 'balhae-pdf-v4';
+const C = 'balhae-pdf-v5-text-20261113';
 self.addEventListener('install', e => { self.skipWaiting(); e.waitUntil(caches.open(C).then(c => c.addAll(['./', './manifest.webmanifest', './icons/icon-192.png'])).catch(() => {})); });
 self.addEventListener('activate', e => e.waitUntil((async () => { for (const k of await caches.keys()) if (k !== C && k !== 'balhae-share') await caches.delete(k); await self.clients.claim(); })()));
 self.addEventListener('fetch', e => {

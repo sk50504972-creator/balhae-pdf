@@ -66,6 +66,15 @@ body.resizing #viewer,body.resizing #thumbs{pointer-events:none}
 .hd{position:absolute;right:-7px;bottom:-7px;width:12px;height:12px;background:#fff;border:2px solid var(--accent);border-radius:2px;cursor:nwse-resize;display:none}
 .an.selected .hd{display:block}
 .hit{position:absolute;background:rgba(255,140,0,.33);outline:1px solid rgba(255,120,0,.85);pointer-events:none}
+.page .txl{position:absolute;inset:0;overflow:hidden;line-height:1;font-family:sans-serif;-webkit-user-select:text;user-select:text}
+.txl span{position:absolute;white-space:pre;color:transparent;transform-origin:0 0;cursor:text}
+.txl span.cov{display:none}
+.txl span::selection{background:rgba(47,111,222,.35);color:transparent}
+#viewer.tool-select .ov{pointer-events:none}
+#viewer.tool-select .ov .an{pointer-events:auto}
+#viewer:not(.tool-select) .txl{pointer-events:none;-webkit-user-select:none;user-select:none}
+.srcpick{position:absolute;outline:1px dashed var(--accent);background:rgba(47,111,222,.08);pointer-events:none}
+#clipTa{width:100%;font:inherit;border:1px solid #cfd6df;border-radius:6px;padding:6px;resize:vertical}
 #viewer.single .page:not(.cur){display:none}
 #viewer.single #pages{min-height:100%;justify-content:center;padding-bottom:40px}
 #viewer.tool-draw .an{pointer-events:none}
@@ -211,9 +220,9 @@ footer #hint{margin-left:12px}
   </div>
   <div class="row">
     <div class="grp" id="tools">
-      <button data-tool="select" class="on" title="개체 선택·이동 (Esc)">선택</button>
+      <button data-tool="select" class="on" title="개체 선택·이동, PDF 글자는 드래그로 골라 복사(Ctrl+C), 더블클릭하면 바로 고치기 (Esc)">선택</button>
       <button data-tool="text" title="클릭한 곳에 글자 입력">텍스트 추가</button>
-      <button data-tool="edittext" title="PDF에 있는 글자를 클릭해서 고치기">텍스트 수정</button>
+      <button data-tool="edittext" title="PDF 글자를 클릭(한 줄)하거나 드래그(여러 줄)해서 바로 고치기. Enter 확정, Shift+Enter 줄바꿈, Esc 취소. 글자를 고른 뒤 누르면 고른 줄을 바로 고칩니다">텍스트 수정</button>
       <button data-tool="whiteout" title="드래그한 부분을 흰색으로 지우기">화이트아웃</button>
       <button data-tool="mask" title="개인정보 가리기 (저장 때 완전 삭제 가능)">마스킹</button>
       <button data-tool="highlight" title="형광펜">형광펜</button>
@@ -226,6 +235,10 @@ footer #hint{margin-left:12px}
       <span class="lbl">글자색</span><input id="fColor" type="color" value="#000000">
       <span class="lbl">선색</span><input id="sColor" type="color" value="#e53935">
       <button id="bDelObj" title="선택한 개체 삭제 (Delete)">개체 삭제</button>
+    </div>
+    <div class="grp">
+      <button id="bCopyTxt" title="드래그(휴대폰은 길게 누르기)로 고른 PDF 글자나 클릭해서 고른 글자 상자를 복사 (Ctrl+C)">글자 복사</button>
+      <button id="bPasteTxt" title="복사한 글자 붙여넣기: 글자 편집 중이면 커서 위치에, 아니면 현재 쪽에 새 글자 상자로 (Ctrl+V)">글자 붙여넣기</button>
     </div>
     <div class="spacer"></div>
     <button id="bInstall" class="primary" hidden title="이 편집기를 PC 앱으로 설치 (탐색기 연결 프로그램·기본 앱 지정 가능)">PC 앱 설치</button>
@@ -247,6 +260,7 @@ footer #hint{margin-left:12px}
         여러 파일을 [열기]로 고르면 각각 탭으로 열립니다 · 쪽을 다른 탭으로 끌어 놓으면 이동(Ctrl 누르고 놓으면 복사) · [나란히 보기]로 두 문서를 같이 보며 옮기기<br>
         왼쪽 목록: 끌어서 순서 변경 · <kbd>Ctrl</kbd>/<kbd>Shift</kbd>+클릭 여러 쪽 선택 · <kbd>Delete</kbd> 쪽 삭제<br>
         <kbd>Ctrl+S</kbd> 저장 · <kbd>Ctrl+Z</kbd> 취소 · <kbd>Ctrl+F</kbd> 검색 · <kbd>Ctrl</kbd>+휠 확대/축소 · 텍스트는 더블클릭으로 다시 고치기<br>
+        PDF 글자는 드래그로 골라 <kbd>Ctrl+C</kbd> 복사 · 글자를 더블클릭하면 바로 고치기 (<kbd>Enter</kbd> 확정 · <kbd>Esc</kbd> 취소)<br>
         파일은 이 PC 안에서만 처리되며 인터넷으로 보내지 않습니다.
       </div>
     </div>
@@ -344,6 +358,14 @@ footer #hint{margin-left:12px}
       <span id="updMsg" class="msg"></span>
     </div>
     <div class="btns"><button value="close" type="submit">닫기</button></div>
+  </form>
+</dialog>
+<dialog id="dlgClip">
+  <form method="dialog">
+    <h3 id="clipTitle">글자 붙여넣기</h3>
+    <p id="clipMsg" style="margin:0 0 8px;font-size:12px;color:#5b6679;line-height:1.6;max-width:460px"></p>
+    <textarea id="clipTa" rows="7"></textarea>
+    <div class="btns"><button value="cancel" type="submit">닫기</button><button id="clipOk" value="ok" class="primary" type="submit">넣기</button></div>
   </form>
 </dialog>
 <div id="shareBar" hidden><span id="shareText">PDF를 만들었습니다.</span><button id="bShareGo" class="primary">공유하기</button><button id="bShareDl">내려받기</button><button id="bShareX">닫기</button></div>
@@ -459,11 +481,13 @@ FONT.ready = (async () => {
     if (m.fontBoundingBoxAscent) { FONT.A = m.fontBoundingBoxAscent / 100; FONT.D = m.fontBoundingBoxDescent / 100; }
   } catch (e) { console.warn('font', e); }
 })();
-const baseOff = () => (LH - (FONT.A + FONT.D)) / 2 + FONT.A;
+const baseOffR = r => (r - (FONT.A + FONT.D)) / 2 + FONT.A;
+const baseOff = () => baseOffR(LH);
+const lhOf = a => (a && a.lh > 0 ? a.lh : LH);
 function textWidth(str, size) { mctx.font = `${size}px BalhaeKR`; return mctx.measureText(str).width; }
 function textBox(a) {
   const lines = (a.text || '').split('\n'); const pad = a.pad || 0;
-  return { w: Math.max(4, ...lines.map(l => textWidth(l, a.size))) + 2 * pad, h: lines.length * a.size * LH + 2 * pad };
+  return { w: Math.max(4, ...lines.map(l => textWidth(l, a.size))) + 2 * pad, h: lines.length * a.size * lhOf(a) + 2 * pad };
 }
 
 // ---------- 크롬 확장 프로그램 안에서 열렸을 때 ----------
@@ -648,7 +672,7 @@ function renderPages() {
   io = new IntersectionObserver(es => {
     for (const e of es) if (e.isIntersecting) {
       const p = pageById(e.target.dataset.id);
-      if (p) drawInto(e.target.querySelector('.ch'), p, S.zoom * (window.devicePixelRatio || 1), mainCache, 24, true);
+      if (p) { drawInto(e.target.querySelector('.ch'), p, S.zoom * (window.devicePixelRatio || 1), mainCache, 24, true); buildTextLayer(e.target, p); }
     }
   }, { root: $('#viewer'), rootMargin: '800px 0px' });
   const frag = document.createDocumentFragment();
@@ -657,7 +681,7 @@ function renderPages() {
     const el = document.createElement('div');
     el.className = 'page' + (p.id === S.currentId ? ' cur' : ''); el.dataset.id = p.id;
     el.style.width = w * S.zoom + 'px'; el.style.height = h * S.zoom + 'px';
-    el.innerHTML = `<div class="ch"></div><div class="ov"></div><div class="pno">${i + 1} / ${S.pages.length}</div>`;
+    el.innerHTML = `<div class="ch"></div><div class="txl"></div><div class="ov"></div><div class="pno">${i + 1} / ${S.pages.length}</div>`;
     frag.appendChild(el);
   });
   host.appendChild(frag);
@@ -780,6 +804,7 @@ function makeAnnotEl(a, z) {
     d.style.fontSize = a.size * z + 'px'; d.style.color = a.color;
     d.style.padding = (a.pad || 0) * z + 'px';
     if (a.border) { const bw = Math.max(1, 1.5 * z); d.style.outline = `${bw}px solid ${a.color}`; d.style.outlineOffset = -bw / 2 + 'px'; }
+    if (a.lh > 0) d.style.lineHeight = String(a.lh);
     d.textContent = a.text;
   } else if (a.type === 'rect') {
     if (a.fill) d.style.background = hexA(a.fill, a.op ?? 1);
@@ -806,11 +831,13 @@ function renderAnnots(p, el) {
     Object.assign(d.style, { left: h.x * z + 'px', top: h.y * z + 'px', width: h.w * z + 'px', height: h.h * z + 'px' });
     ov.appendChild(d);
   }
+  syncTextLayer(p, el);
 }
 function selectAnnot(p, a) {
   S.sel = a ? { pid: p.id, aid: a.id } : null;
   document.querySelectorAll('.an.selected').forEach(e => e.classList.remove('selected'));
   if (!a) return;
+  clearLayerSelection();
   const el = pageEl(p.id)?.querySelector(`.an[data-aid="${a.id}"]`); if (el) el.classList.add('selected');
   if (a.type === 'text') { $('#fSize').value = a.size; $('#fColor').value = a.color; }
   if (a.type === 'rect' && a.kind === 'box') $('#sColor').value = a.stroke;
@@ -833,9 +860,9 @@ const RECT_KINDS = {
   box: () => ({ stroke: S.style.shape, sw: 1.5 }),
 };
 const HINTS = {
-  select: '글자·네모·도장을 끌어서 옮기고, 모서리 점으로 크기를 바꿉니다. 글자는 더블클릭하면 다시 고칠 수 있습니다.',
+  select: '글자·네모·도장을 끌어서 옮기고, 모서리 점으로 크기를 바꿉니다. PDF 글자는 드래그로 골라 Ctrl+C로 복사하고, 더블클릭하면 바로 고칩니다.',
   text: '글자를 넣을 곳을 클릭하고 입력하세요. Enter는 줄바꿈, Esc 또는 바깥 클릭으로 끝냅니다.',
-  edittext: 'PDF 속 글자를 클릭하면 그 줄이 흰색으로 덮이고 고칠 수 있는 글자로 바뀝니다. (스캔 문서는 화이트아웃 후 텍스트 추가)',
+  edittext: 'PDF 글자를 클릭하면 그 줄을, 드래그하면 여러 줄을 바로 고칩니다. Enter 확정 · Shift+Enter 줄바꿈 · Esc 취소. 원래 글자는 흰 상자 아래 남으니 개인정보는 [마스킹]을 쓰세요. (스캔 문서는 글자 인식을 하지 않으므로 화이트아웃 후 텍스트 추가)',
   whiteout: '지울 부분을 드래그하세요. 흰색으로 덮입니다.',
   mask: '가릴 부분(주민번호·계좌 등)을 드래그하세요. 저장할 때 아래 글자까지 완전히 지울 수 있습니다.',
   highlight: '강조할 부분을 드래그하세요.',
@@ -843,15 +870,22 @@ const HINTS = {
 };
 function setTool(t) {
   if (document.activeElement && document.activeElement.isContentEditable) document.activeElement.blur();
+  clearLayerSelection();
   S.tool = t;
   document.querySelectorAll('#tools [data-tool]').forEach(b => b.classList.toggle('on', b.dataset.tool === t));
   const v = $('#viewer');
   v.classList.toggle('tool-draw', !!RECT_KINDS[t]);
   v.classList.toggle('tool-text', t === 'text');
   v.classList.toggle('tool-edittext', t === 'edittext');
+  v.classList.toggle('tool-select', t === 'select');
   $('#hint').textContent = HINTS[t] || '';
 }
-document.querySelectorAll('#tools [data-tool]').forEach(b => b.onclick = () => setTool(b.dataset.tool));
+document.querySelectorAll('#tools [data-tool]').forEach(b => b.onclick = () => {
+  // 글자를 고른 채 [텍스트 수정]을 누르면 고른 줄을 바로 고친다 (휴대폰: 길게 눌러 고른 뒤 버튼)
+  const pick = b.dataset.tool === 'edittext' ? layerSelectionBox() : null;
+  setTool(b.dataset.tool);
+  if (pick && pick.p) editTextBlock(pick.p, pick.box);
+});
 
 function visibleCenter(p) {
   const el = pageEl(p.id); const { w, h } = dims(p);
@@ -878,7 +912,7 @@ $('#pages').addEventListener('pointerdown', e => {
   if (anEl && !RECT_KINDS[t]) {
     const a = p.annots.find(x => x.id === anEl.dataset.aid); if (!a) return;
     e.preventDefault();
-    if (t === 'text' && a.type === 'text') { selectAnnot(p, a); startEdit(p, a, snapshot()); return; }
+    if ((t === 'text' || t === 'edittext') && a.type === 'text') { selectAnnot(p, a); startEdit(p, a, snapshot()); return; }
     selectAnnot(p, a);
     const handle = e.target.closest('.hd');
     const st = pt(e), orig = { x: a.x, y: a.y, w: a.w, h: a.h }, snap = snapshot(); let moved = false;
@@ -889,14 +923,33 @@ $('#pages').addEventListener('pointerdown', e => {
       else { a.x = orig.x + dx; a.y = orig.y + dy; }
       positionAnnotEl(anEl, a);
     };
-    const up = () => { removeEventListener('pointermove', mv); removeEventListener('pointerup', up); if (moved) { pushUndo(snap); markDirty(); } };
+    const up = () => { removeEventListener('pointermove', mv); removeEventListener('pointerup', up); if (moved) { pushUndo(snap); markDirty(); syncTextLayer(p); } };
     addEventListener('pointermove', mv); addEventListener('pointerup', up);
     return;
   }
   if (t === 'select') { selectAnnot(p, null); return; }
   e.preventDefault();
   if (t === 'text') { addText(p, pt(e)); return; }
-  if (t === 'edittext') { editExistingText(p, pt(e)); return; }
+  if (t === 'edittext') {
+    // 클릭 = 그 줄 고치기, 드래그 = 네모 안의 여러 줄 고치기
+    const st = pt(e); let box = null, done = false; const tmp = document.createElement('div'); tmp.className = 'srcpick';
+    const mv = ev => {
+      const q = pt(ev);
+      if (!box && Math.hypot(q.x - st.x, q.y - st.y) * z < 6) return;
+      box = { x: Math.min(st.x, q.x), y: Math.min(st.y, q.y), w: Math.abs(q.x - st.x), h: Math.abs(q.y - st.y) };
+      if (!tmp.isConnected) ov.appendChild(tmp);
+      Object.assign(tmp.style, { left: box.x * z + 'px', top: box.y * z + 'px', width: box.w * z + 'px', height: box.h * z + 'px' });
+    };
+    const end = ev => {
+      if (done) return; done = true;
+      removeEventListener('pointermove', mv); removeEventListener('pointerup', end); removeEventListener('pointercancel', end);
+      tmp.remove();
+      if (ev.type === 'pointercancel') return;
+      if (box) editTextBlock(p, box); else editExistingText(p, st);
+    };
+    addEventListener('pointermove', mv); addEventListener('pointerup', end); addEventListener('pointercancel', end);
+    return;
+  }
   if (RECT_KINDS[t]) {
     const st = pt(e); const props = RECT_KINDS[t]();
     const a = { id: nid('a'), type: 'rect', kind: t, x: st.x, y: st.y, w: 0, h: 0, ...props };
@@ -911,9 +964,20 @@ $('#pages').addEventListener('pointerdown', e => {
 });
 $('#pages').addEventListener('dblclick', e => {
   const anEl = e.target.closest('.an-text'); const pe = e.target.closest('.page');
-  if (!anEl || !pe || anEl.isContentEditable) return;
-  const p = pageById(pe.dataset.id); const a = p?.annots.find(x => x.id === anEl.dataset.aid);
-  if (a) { selectAnnot(p, a); startEdit(p, a, snapshot()); }
+  if (!pe) return;
+  if (anEl) {
+    if (anEl.isContentEditable) return;
+    const p = pageById(pe.dataset.id); const a = p?.annots.find(x => x.id === anEl.dataset.aid);
+    if (a) { selectAnnot(p, a); startEdit(p, a, snapshot()); }
+    return;
+  }
+  // [선택] 상태에서 PDF 원문 글자를 더블클릭하면 그 줄을 바로 고친다
+  if (S.tool !== 'select' || !e.target.closest('.txl span')) return;
+  const p = pageById(pe.dataset.id); if (!p) return;
+  const r = pe.querySelector('.ov').getBoundingClientRect();
+  const q = { x: (e.clientX - r.left) / S.zoom, y: (e.clientY - r.top) / S.zoom };
+  const sl = getSelection(); if (sl) sl.removeAllRanges();
+  editExistingText(p, q);
 });
 
 function addText(p, q) {
@@ -924,17 +988,40 @@ function addText(p, q) {
 function startEdit(p, a, snap, mode) {
   const el = pageEl(p.id)?.querySelector(`.an[data-aid="${a.id}"]`); if (!el) return;
   const orig = a.text;
+  // 원문 고치기(mode 'edit' 또는 원문에서 만든 글자 상자): Enter 확정 · Shift+Enter 줄바꿈 · Esc 취소
+  const srcMode = mode === 'edit' || !!a.src;
+  let cancelled = false, composing = false;
   try { el.contentEditable = 'plaintext-only'; } catch { el.contentEditable = 'true'; }
   if (el.contentEditable !== 'plaintext-only') el.contentEditable = 'true';
   el.classList.add('editing'); S.editing = true; el.focus();
   const sel = getSelection(), rg = document.createRange(); rg.selectNodeContents(el); rg.collapse(false); sel.removeAllRanges(); sel.addRange(rg);
+  $('#hint').textContent = srcMode ? 'Enter 확정 · Shift+Enter 줄바꿈 · Esc 취소(원래대로) · Ctrl+V 붙여넣기' : 'Enter 줄바꿈 · Esc 또는 바깥 클릭으로 끝냅니다 · Ctrl+V 붙여넣기';
   const kd = ev => {
-    if (ev.key === 'Escape') { ev.preventDefault(); el.blur(); }
-    if (!(ev.ctrlKey && ev.key.toLowerCase() === 's')) ev.stopPropagation();
+    // 한글 입력(IME) 조합 중의 Enter·Esc는 조합 확정에만 쓴다
+    if (ev.isComposing || composing || ev.keyCode === 229) { ev.stopPropagation(); return; }
+    if (ev.key === 'Escape') { ev.preventDefault(); if (srcMode) cancelled = true; el.blur(); }
+    else if (srcMode && ev.key === 'Enter' && !ev.shiftKey && !ev.altKey && !ev.ctrlKey && !ev.metaKey) { ev.preventDefault(); el.blur(); }
+    if (!((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 's')) ev.stopPropagation();
+  };
+  const cs = () => { composing = true; };
+  const ce = () => { setTimeout(() => { composing = false; }, 0); };
+  const ps = ev => {
+    // 붙여넣기는 글자만 (서식·그림 제외)
+    const cd = ev.clipboardData; if (!cd) return;
+    ev.preventDefault();
+    const t = cleanText(cd.getData('text/plain') || '');
+    if (t) insertPlain(el, t);
   };
   const finish = () => {
-    el.removeEventListener('keydown', kd); el.removeEventListener('blur', finish); S.editing = false;
+    el.removeEventListener('keydown', kd); el.removeEventListener('blur', finish); el.removeEventListener('paste', ps);
+    el.removeEventListener('compositionstart', cs); el.removeEventListener('compositionend', ce);
+    S.editing = false; $('#hint').textContent = HINTS[S.tool] || '';
     const txt = el.innerText.replace(/\u00a0/g, ' ').replace(/\r/g, '').replace(/\n+$/, '');
+    if (cancelled) {
+      p.annots = JSON.parse(snap).find(x => x.id === p.id).annots; S.sel = null;
+      renderAnnots(p); toast('고치기를 취소했습니다', 1500); return;
+    }
+    if (srcMode && txt !== orig) noticeSrcLimit();
     if (mode === 'edit' && txt === orig) {
       p.annots = JSON.parse(snap).find(x => x.id === p.id).annots; S.sel = null;
     } else if (!txt.trim()) {
@@ -945,7 +1032,8 @@ function startEdit(p, a, snap, mode) {
     }
     renderAnnots(p);
   };
-  el.addEventListener('keydown', kd); el.addEventListener('blur', finish);
+  el.addEventListener('keydown', kd); el.addEventListener('blur', finish); el.addEventListener('paste', ps);
+  el.addEventListener('compositionstart', cs); el.addEventListener('compositionend', ce);
 }
 
 // text extraction
@@ -955,7 +1043,7 @@ async function getTextItems(p) {
   if (textCache.has(key)) return textCache.get(key);
   const pg = await S.sources.get(p.src).pdf.getPage(p.idx + 1);
   const vp = pg.getViewport({ scale: 1, rotation: rotT(p) });
-  const tc = await pg.getTextContent();
+  const tc = await rawText(p);
   const out = [];
   for (const it of tc.items) {
     if (!('str' in it)) continue;
@@ -969,27 +1057,441 @@ async function getTextItems(p) {
 async function editExistingText(p, q) {
   let items;
   try { items = await getTextItems(p); } catch (e) { console.error(e); items = []; }
+  items = uncoveredItems(p, items);
   const hit = items.find(it => it.str.trim() && q.x >= it.x - 2 && q.x <= it.x + it.w + 2 && q.y >= it.base - it.h * 0.95 - 2 && q.y <= it.base + it.h * 0.3 + 2);
-  if (!hit) { toast('여기에서 글자를 찾지 못했습니다. 스캔·사진 문서는 [화이트아웃]으로 지운 뒤 [텍스트 추가]를 쓰세요.', 4500); return; }
+  if (!hit) { srcMissToast(p, items); return; }
   const line = items.filter(it => Math.abs(it.base - hit.base) < hit.h * 0.35 && Math.abs(it.h - hit.h) < hit.h * 0.5).sort((a, b) => a.x - b.x);
   let L = line.indexOf(hit), R = L;
   while (L > 0 && line[L].x - (line[L - 1].x + line[L - 1].w) < hit.h * 1.2) L--;
   while (R < line.length - 1 && line[R + 1].x - (line[R].x + line[R].w) < hit.h * 1.2) R++;
   const seg = line.slice(L, R + 1);
+  beginSrcEdit(p, [seg], q, hit);
+}
+
+// ---------- 원문 글자 바로 고치기 (흰 상자로 덮고 고친 글자를 위에 쓴다) ----------
+function segText(seg) {
   let text = '';
   seg.forEach((it, k) => {
     if (k > 0) { const gap = it.x - (seg[k - 1].x + seg[k - 1].w); if (gap > it.h * 0.2 && !/\s$/.test(text) && !/^\s/.test(it.str)) text += ' '; }
     text += it.str;
   });
-  text = text.replace(/\s+$/, '');
-  const x0 = Math.min(...seg.map(s => s.x)), x1 = Math.max(...seg.map(s => s.x + s.w));
-  const top = Math.min(...seg.map(s => s.base - s.h * 0.92)), bot = Math.max(...seg.map(s => s.base + s.h * 0.28));
-  const size = Math.round(hit.h * 10) / 10;
+  return text.replace(/\s+$/, '');
+}
+const coverRects = p => p.annots.filter(a => a.type === 'rect' && (a.kind === 'whiteout' || a.kind === 'mask'));
+const maskRects = p => p.annots.filter(a => a.type === 'rect' && a.kind === 'mask');
+const woRects = p => p.annots.filter(a => a.type === 'rect' && a.kind === 'whiteout');
+// 두 상자가 조금이라도 겹치는지
+function overlapsAny(b, rs) {
+  for (const r of rs) { if (Math.min(b.x + b.w, r.x + r.w) - Math.max(b.x, r.x) > 0 && Math.min(b.y + b.h, r.y + r.h) - Math.max(b.y, r.y) > 0) return true; }
+  return false;
+}
+// 원문 조각을 숨길지: 마스킹은 조금이라도 겹치면 조각 전체(보수적, 개인정보 보호), 화이트아웃은 면적 50% 이상
+function hiddenBox(b, ms, ws) { return overlapsAny(b, ms) || coveredBy(b, ws); }
+// 글자 상자 위에 나중에 그린 마스킹이 겹치는지 (가려진 글자 상자는 복사하지 않는다)
+function maskedAnnot(p, a) {
+  const i = p.annots.indexOf(a); const tb = textBox(a);
+  return overlapsAny({ x: a.x, y: a.y, w: tb.w, h: tb.h }, p.annots.filter((m, j) => j > i && m.type === 'rect' && m.kind === 'mask'));
+}
+function coveredBy(b, rs) {
+  if (!rs.length) return false;
+  const area = Math.max(1e-6, b.w * b.h); let cov = 0;
+  for (const r of rs) {
+    const ix = Math.min(b.x + b.w, r.x + r.w) - Math.max(b.x, r.x), iy = Math.min(b.y + b.h, r.y + r.h) - Math.max(b.y, r.y);
+    if (ix > 0 && iy > 0) cov += ix * iy;
+  }
+  return cov / area >= 0.5;
+}
+// 이미 흰 상자·마스킹으로 덮인 원문은 다시 고치기 대상에서 뺀다 (고친 줄은 그 글자 상자를 고친다)
+function uncoveredItems(p, items) {
+  const ms = maskRects(p), ws = woRects(p); if (!ms.length && !ws.length) return items;
+  return items.filter(it => !hiddenBox({ x: it.x, y: it.base - it.h * 0.92, w: it.w, h: it.h * 1.2 }, ms, ws));
+}
+async function srcMissToast(p, items) {
+  let raw = 0; try { raw = (await layerItems(p)).filter(it => it.str.trim()).length; } catch {}
+  if (!raw) toast('이 쪽에는 글자 정보가 없습니다 (스캔·사진 문서). 글자 인식(OCR)은 하지 않아 원문을 바로 고칠 수 없습니다. [화이트아웃]으로 지운 뒤 [텍스트 추가]를 쓰세요.', 6500);
+  else if (!items.some(it => it.str.trim())) toast('이 쪽 글자는 기울어지거나 세로로 쓰였거나 이미 덮여 있어 바로 고칠 수 없습니다. [화이트아웃] 후 [텍스트 추가]를 쓰세요.', 5500);
+  else toast('여기에서 글자를 찾지 못했습니다. 글자 위를 정확히 누르거나, 여러 줄은 드래그해서 고르세요. 스캔·사진 부분은 [화이트아웃] 후 [텍스트 추가]를 쓰세요.', 5000);
+}
+// lines: 줄별 원문 조각 배열(위에서 아래, 각 줄은 왼쪽에서 오른쪽). q: 클릭 지점(커서 위치), hit: 클릭한 조각
+function beginSrcEdit(p, lines, q, hit) {
+  const all = lines.flat();
+  const hs = all.map(s => s.h).sort((a, b) => a - b);
+  const size = Math.round((hit ? hit.h : hs[Math.floor(hs.length / 2)]) * 10) / 10;
+  const x0 = Math.min(...all.map(s => s.x)), x1 = Math.max(...all.map(s => s.x + s.w));
+  const top = Math.min(...all.map(s => s.base - s.h * 0.92)), bot = Math.max(...all.map(s => s.base + s.h * 0.28));
+  const baseOfLine = seg => seg.reduce((t, s) => t + s.base, 0) / seg.length;
+  const b0 = hit && lines.length === 1 ? hit.base : baseOfLine(lines[0]);
+  let r = LH;
+  if (lines.length > 1) {
+    const pitch = (baseOfLine(lines[lines.length - 1]) - b0) / (lines.length - 1);
+    if (pitch > 0) r = Math.min(4, Math.max(0.9, pitch / size));
+  }
+  // 마스킹한 곳과 겹치는 블록은 고치지 않는다 (흰 상자·글자가 마스킹 위에 올라가 가린 내용이 다시 드러나거나 불러와지는 것을 막음)
+  if (overlapsAny({ x: x0 - 1, y: top - 1, w: x1 - x0 + 2, h: bot - top + 2 }, maskRects(p))) {
+    toast('마스킹한 부분과 겹쳐 바로 고칠 수 없습니다. 마스킹을 피해 범위를 줄이거나 [텍스트 추가]를 쓰세요.', 5000);
+    return;
+  }
+  const text = lines.map(segText).join('\n');
   const snap = snapshot();
   const wo = { id: nid('a'), type: 'rect', kind: 'whiteout', fill: '#ffffff', op: 1, x: x0 - 1, y: top - 1, w: x1 - x0 + 2, h: bot - top + 2 };
-  const ta = { id: nid('a'), type: 'text', x: x0, y: hit.base - baseOff() * size, text, size, color: S.style.color, pad: 0 };
+  const ta = { id: nid('a'), type: 'text', src: 1, x: x0, y: b0 - baseOffR(r) * size, text, size, color: S.style.color, pad: 0 };
+  if (Math.abs(r - LH) > 0.01) ta.lh = Math.round(r * 1000) / 1000;
   p.annots.push(wo, ta); renderAnnots(p); selectAnnot(p, ta); startEdit(p, ta, snap, 'edit');
+  if (q) placeCaret(p, q);
+  if (!srcTipShown) { srcTipShown = true; toast('Enter 확정 · Shift+Enter 줄바꿈 · Esc 취소(원래대로)', 3000); }
 }
+let srcTipShown = false, srcNoticeShown = false;
+function noticeSrcLimit() {
+  if (srcNoticeShown) return; srcNoticeShown = true;
+  setTimeout(() => toast('알림: 고친 줄의 원래 글자는 흰 상자 아래에 남아, 저장한 PDF에서도 복사·검색될 수 있습니다. 주민번호·계좌 등 개인정보는 [마스킹]으로 가리고 저장할 때 [확인]을 눌러 완전히 지우세요. 원본을 보존하려면 [다른 이름으로 저장]으로 새 파일에 저장하세요.', 10000), 400);
+}
+function placeCaret(p, q) {
+  const el = document.activeElement; const pe = pageEl(p.id);
+  if (!el || !el.isContentEditable || !pe) return;
+  const r = pe.querySelector('.ov').getBoundingClientRect();
+  const cx = r.left + q.x * S.zoom, cy = r.top + q.y * S.zoom;
+  let rg = null;
+  try {
+    if (document.caretRangeFromPoint) rg = document.caretRangeFromPoint(cx, cy);
+    else if (document.caretPositionFromPoint) { const cp = document.caretPositionFromPoint(cx, cy); if (cp) { rg = document.createRange(); rg.setStart(cp.offsetNode, cp.offset); } }
+  } catch { rg = null; }
+  if (rg && el.contains(rg.startContainer)) { rg.collapse(true); const s = getSelection(); s.removeAllRanges(); s.addRange(rg); }
+}
+// 드래그한 네모(쪽 단위 좌표) 안의 원문 여러 줄을 한 번에 고친다
+async function editTextBlock(p, box) {
+  let items; try { items = await getTextItems(p); } catch (e) { console.error(e); items = []; }
+  items = uncoveredItems(p, items);
+  const sel = items.filter(it => it.str.trim() && it.x < box.x + box.w && it.x + it.w > box.x && it.base - it.h * 0.92 < box.y + box.h && it.base + it.h * 0.28 > box.y);
+  if (!sel.length) { srcMissToast(p, items); return; }
+  sel.sort((a, b) => a.base - b.base);
+  const lines = [];
+  for (const it of sel) {
+    const ln = lines.find(l => Math.abs(l.base - it.base) < Math.min(l.h, it.h) * 0.4);
+    if (ln) ln.items.push(it); else lines.push({ base: it.base, h: it.h, items: [it] });
+  }
+  if (lines.length > 60) { toast('한 번에 고칠 수 있는 줄은 60줄까지입니다. 범위를 줄여 다시 드래그하세요.', 4500); return; }
+  lines.sort((a, b) => a.base - b.base);
+  if (S.tool !== 'edittext') setTool('edittext');
+  beginSrcEdit(p, lines.map(l => l.items.sort((a, b) => a.x - b.x)), null, null);
+}
+
+// ---------- PDF 원문 글자 선택 층 (복사용, 투명 글자) ----------
+const rawTextCache = new Map(), layerCache = new Map();
+function rawText(p) {
+  const key = `${p.src}|${p.idx}`;
+  let pr = rawTextCache.get(key);
+  if (!pr) {
+    pr = S.sources.get(p.src).pdf.getPage(p.idx + 1).then(pg => pg.getTextContent());
+    pr.catch(() => rawTextCache.delete(key));
+    lruSet(rawTextCache, key, pr, 200);
+  }
+  return pr;
+}
+async function layerItems(p) {
+  const key = `${p.src}|${p.idx}|${rotT(p)}`;
+  if (layerCache.has(key)) return layerCache.get(key);
+  const pg = await S.sources.get(p.src).pdf.getPage(p.idx + 1);
+  const vp = pg.getViewport({ scale: 1, rotation: rotT(p) });
+  const tc = await rawText(p);
+  const out = [];
+  for (const it of tc.items) {
+    if (!('str' in it)) continue;
+    if (!it.str) { if (it.hasEOL && out.length) out[out.length - 1].eol = true; continue; }
+    const m = pdfjsLib.Util.transform(vp.transform, it.transform);
+    const h = Math.hypot(m[2], m[3]); if (!h) continue;
+    const st = (tc.styles || {})[it.fontName] || {};
+    let ang = Math.atan2(m[1], m[0]); if (st.vertical) ang += Math.PI / 2;
+    const asc = st.ascent ? st.ascent : st.descent ? 1 + st.descent : 0.8;
+    const w = Math.abs(st.vertical ? it.height : it.width) || 0;
+    const sin = Math.sin(ang), cos = Math.cos(ang);
+    const left = m[4] + asc * h * sin, top = m[5] - asc * h * cos;
+    const xs = [left, left + w * cos, left - h * sin, left + w * cos - h * sin];
+    const ys = [top, top + w * sin, top + h * cos, top + w * sin + h * cos];
+    const bx = Math.min(...xs), by = Math.min(...ys);
+    out.push({ str: it.str, left, top, ang, h, w, ox: m[4], oy: m[5], eol: !!it.hasEOL, flat: Math.abs(sin) < 0.02 && cos > 0, box: { x: bx, y: by, w: Math.max(...xs) - bx, h: Math.max(...ys) - by } });
+  }
+  lruSet(layerCache, key, out, 60);
+  return out;
+}
+const layerCtx = document.createElement('canvas').getContext('2d');
+async function buildTextLayer(pe, p) {
+  const host = pe && pe.querySelector('.txl'); if (!host) return;
+  const z = S.zoom, key = `${p.src}|${p.idx}|${rotT(p)}|${z}`;
+  if (host.dataset.key === key) return;
+  host.dataset.key = key;
+  let items;
+  try { items = await layerItems(p); } catch (e) { console.warn('text layer', e); return; }
+  if (host.dataset.key !== key || !host.isConnected) return;
+  const frag = document.createDocumentFragment();
+  for (const it of items) {
+    const s = document.createElement('span');
+    const fs = it.h * z;
+    s.textContent = it.str;
+    s.style.left = it.left * z + 'px'; s.style.top = it.top * z + 'px'; s.style.fontSize = fs + 'px';
+    layerCtx.font = `${fs}px sans-serif`;
+    const mw = layerCtx.measureText(it.str).width;
+    const sx = mw > 0 && it.w > 0 ? (it.w * z) / mw : 1;
+    let tf = '';
+    if (Math.abs(it.ang) > 1e-3) tf += `rotate(${it.ang}rad) `;
+    if (Math.abs(sx - 1) > 1e-3) tf += `scaleX(${sx})`;
+    if (tf) s.style.transform = tf.trim();
+    s._it = it;
+    frag.appendChild(s);
+  }
+  host.replaceChildren(frag);
+  syncTextLayer(p, pe);
+}
+// 흰 상자·마스킹으로 덮인 원문은 선택·복사되지 않게 숨긴다 (화면에 보이는 내용과 맞춤)
+function syncTextLayer(p, pe) {
+  pe = pe || pageEl(p.id);
+  const host = pe && pe.querySelector('.txl'); if (!host || !host.firstChild) return;
+  const ms = maskRects(p), ws = woRects(p);
+  for (const s of host.children) { const b = s._it && s._it.box; if (b) s.classList.toggle('cov', hiddenBox(b, ms, ws)); }
+}
+function selAnchorEl(sel) { const n = sel && sel.anchorNode; return n ? (n.nodeType === 1 ? n : n.parentElement) : null; }
+function clearLayerSelection() {
+  const s = getSelection();
+  if (s && s.rangeCount && !s.isCollapsed) { const el = selAnchorEl(s); if (el && el.closest('.txl')) s.removeAllRanges(); }
+}
+function hasTextSelection() {
+  const s = getSelection();
+  if (!s || s.isCollapsed || !s.rangeCount || !s.toString().trim()) return false;
+  const el = selAnchorEl(s);
+  return !!el && !el.closest('#thumbs,#sideList,#docTabs');
+}
+function selectedSpans(rg, host, withCovered) {
+  const out = [];
+  for (const s of host.children) {
+    const cov = s.classList.contains('cov');
+    if (!s._it || (cov && !withCovered) || !rg.intersectsNode(s)) continue;
+    if (cov) { out.push({ it: s._it, str: '', cov: true }); continue; }
+    const tn = s.firstChild, full = s.textContent; let a = 0, b = full.length;
+    if (tn && rg.startContainer === tn) a = rg.startOffset; else if (rg.startContainer === s && rg.startOffset > 0) a = b;
+    if (tn && rg.endContainer === tn) b = rg.endOffset; else if (rg.endContainer === s && rg.endOffset === 0) b = 0;
+    const str = full.slice(a, b);
+    if (str) out.push({ it: s._it, str });
+  }
+  return out;
+}
+// 고른 원문 조각을 줄·띄어쓰기를 살려 글자로 만든다. 고친 줄(글자 상자)이 범위 안에 있으면 고친 내용을 넣는다
+function joinPageFrags(p, frs, area) {
+  const xs = (area && area.length ? area : frs).map(f => f.it.box); if (!xs.length) return '';
+  const ux0 = Math.min(...xs.map(b => b.x)), uy0 = Math.min(...xs.map(b => b.y));
+  const ux1 = Math.max(...xs.map(b => b.x + b.w)), uy1 = Math.max(...xs.map(b => b.y + b.h));
+  const ann = [];
+  for (const a of p.annots) {
+    if (a.type !== 'text' || !a.text || a.tag === 'pno' || maskedAnnot(p, a)) continue;
+    const tb = textBox(a), cx = a.x + tb.w / 2, cy = a.y + tb.h / 2;
+    if (cx < ux0 || cx > ux1 || cy < uy0 || cy > uy1) continue;
+    const pad = a.pad || 0, lr = lhOf(a);
+    a.text.split('\n').forEach((ln, i) => { if (ln) ann.push({ x: a.x + pad, base: a.y + pad + i * a.size * lr + baseOffR(lr) * a.size, h: a.size, w: textWidth(ln, a.size), str: ln }); });
+  }
+  const gapSp = (prev, cur, acc) => (cur.x - (prev.x + prev.w) > Math.min(prev.h, cur.h) * 0.2 && !/\s$/.test(acc) && !/^\s/.test(cur.str) ? ' ' : '');
+  if (!ann.length) {
+    if (!frs.length) return '';
+    let s = '', prev = null;
+    for (const f of frs) {
+      const it = f.it;
+      if (prev) {
+        if (prev.eol || (prev.flat && it.flat && Math.abs(it.oy - prev.oy) > Math.min(prev.h, it.h) * 0.5) || (!(prev.flat && it.flat) && Math.abs(it.ang - prev.ang) > 0.01)) { if (!s.endsWith('\n')) s += '\n'; }
+        else if (prev.flat && it.flat) s += gapSp({ x: prev.ox, w: prev.w, h: prev.h }, { x: it.ox, h: it.h, str: f.str }, s);
+      }
+      s += f.str; prev = it;
+    }
+    return s.replace(/[ \t]+\n/g, '\n');
+  }
+  // 고친 줄이 섞이면 위치(줄 → 왼쪽부터) 순서로 합친다
+  const parts = frs.map(f => ({ x: f.it.ox, base: f.it.oy, h: f.it.h, w: f.it.w, str: f.str })).concat(ann).sort((a, b) => a.base - b.base);
+  const lines = [];
+  for (const f of parts) { const ln = lines.find(l => Math.abs(l.base - f.base) < Math.min(l.h, f.h) * 0.5); if (ln) ln.items.push(f); else lines.push({ base: f.base, h: f.h, items: [f] }); }
+  lines.sort((a, b) => a.base - b.base);
+  return lines.map(l => { const its = l.items.sort((a, b) => a.x - b.x); let s = ''; its.forEach((f, k) => { if (k) s += gapSp(its[k - 1], f, s); s += f.str; }); return s.replace(/\s+$/, ''); }).join('\n');
+}
+// 화면에서 고른 PDF 원문 글자. 원문 층 밖의 선택이면 null, 고른 것이 모두 가려진 글자면 ''
+function layerSelectionText() {
+  const sel = getSelection(); if (!sel || sel.isCollapsed || !sel.rangeCount) return null;
+  const rg = sel.getRangeAt(0), root = $('#pages');
+  const ca = rg.commonAncestorContainer, cae = ca.nodeType === 1 ? ca : ca.parentElement;
+  if (!cae || !root.contains(cae) || cae.closest('.an')) return null;
+  const out = []; let touched = false;
+  for (const pe of root.querySelectorAll('.page')) {
+    const host = pe.querySelector('.txl'); if (!host || !rg.intersectsNode(host)) continue;
+    touched = true;
+    const p = pageById(pe.dataset.id); if (!p) continue;
+    // 범위는 가려진 원문까지 포함해 잡고(고친 글자 상자 찾기용), 글자는 보이는 것만 쓴다
+    const all = selectedSpans(rg, host, true), frs = all.filter(f => !f.cov);
+    if (all.length) { const t = joinPageFrags(p, frs, all); if (t) out.push(t); }
+  }
+  if (!touched) return null;
+  return out.join('\n\n');
+}
+function layerSelectionBox() {
+  const sel = getSelection(); if (!sel || sel.isCollapsed || !sel.rangeCount) return null;
+  const rg = sel.getRangeAt(0);
+  for (const pe of $('#pages').querySelectorAll('.page')) {
+    const host = pe.querySelector('.txl'); if (!host || !rg.intersectsNode(host)) continue;
+    const its = selectedSpans(rg, host).map(f => f.it).filter(it => it.flat);
+    if (!its.length) continue;
+    const x0 = Math.min(...its.map(i => i.box.x)), x1 = Math.max(...its.map(i => i.box.x + i.box.w));
+    const y0 = Math.min(...its.map(i => i.oy - i.h * 0.6)), y1 = Math.max(...its.map(i => i.oy - i.h * 0.2));
+    return { p: pageById(pe.dataset.id), box: { x: x0, y: y0, w: Math.max(1, x1 - x0), h: Math.max(1, y1 - y0) } };
+  }
+  return null;
+}
+
+// ---------- 글자 복사·붙여넣기 (클립보드 권한이 없으면 수동 창) ----------
+let clipKind = null, pageMark = '', pasteWait = 0, clipCb = null, markPending = null;
+function cleanText(t) {
+  return String(t).replace(/\r\n?/g, '\n').replace(/\t/g, '    ').replace(/[\u0000-\u0008\u000b-\u001f\u007f\u200b\ufeff]/g, '').replace(/\u00a0/g, ' ').replace(/\n+$/, '');
+}
+function insertPlain(el, text) {
+  if (document.activeElement !== el) el.focus();
+  let ok = false;
+  try { ok = document.execCommand('insertText', false, text); } catch { ok = false; }
+  if (ok) return;
+  const sel = getSelection();
+  if (!sel.rangeCount || !el.contains(sel.anchorNode)) { const r0 = document.createRange(); r0.selectNodeContents(el); r0.collapse(false); sel.removeAllRanges(); sel.addRange(r0); }
+  const r = sel.getRangeAt(0); r.deleteContents();
+  const tn = document.createTextNode(text); r.insertNode(tn); r.setStartAfter(tn); r.collapse(true);
+  sel.removeAllRanges(); sel.addRange(r);
+}
+function legacyCopy(text) {
+  const ta = document.createElement('textarea'); ta.value = text; ta.setAttribute('readonly', '');
+  ta.style.cssText = 'position:fixed;left:-9999px;top:0;opacity:0';
+  document.body.appendChild(ta); ta.select();
+  let ok = false; try { ok = document.execCommand('copy'); } catch { ok = false; }
+  ta.remove(); return ok;
+}
+// 클립보드 API가 권한 대기 등으로 응답하지 않으면 일정 시간 뒤 다른 방법으로 넘어간다 (권한 자체는 우회하지 않음)
+const CLIP_WAIT_MS = 1800;
+let pasteSeq = 0, copySeq = 0;
+function clipTimeout(pr, ms) {
+  let t;
+  return Promise.race([
+    Promise.resolve(pr).then(v => ({ ok: true, v }), e => ({ ok: false, e })),
+    new Promise(r => { t = setTimeout(() => r({ ok: false, timeout: true }), ms); }),
+  ]).finally(() => clearTimeout(t));
+}
+async function copyPlain(text, msg) {
+  clipKind = 'text';
+  const seq = ++copySeq; let why = '';
+  if (navigator.clipboard && navigator.clipboard.writeText && window.isSecureContext !== false) {
+    let res;
+    try { res = await clipTimeout(navigator.clipboard.writeText(text), CLIP_WAIT_MS); } catch (e) { res = { ok: false, e }; }
+    if (seq !== copySeq) return false; // 더 나중 복사 요청이 있으면 이 결과는 버린다
+    if (res.ok) { toast(msg, 2200); return true; }
+    console.warn('clipboard write', res.timeout ? 'timeout' : res.e);
+    if (res.timeout) why = '브라우저의 클립보드 응답이 없습니다(권한 확인 대기).';
+  }
+  const ae = document.activeElement;
+  if (ae && ae.isContentEditable) { toast('브라우저가 자동 복사를 막았습니다. 글자를 고른 뒤 Ctrl+C(맥은 Cmd+C)를 누르세요.', 4500); return false; }
+  if (legacyCopy(text)) { toast(msg, 2200); return true; }
+  openClipDialog('copy', text, null, why); return false;
+}
+function openClipDialog(mode, text, cb, why) {
+  const d = $('#dlgClip');
+  if (!d || !d.showModal) {
+    if (mode === 'paste') { const t = prompt('붙여넣을 글자를 여기에 붙여넣으세요', ''); if (t && cb) cb(t); }
+    else prompt('Ctrl+C(맥은 Cmd+C)로 복사하세요', text);
+    return;
+  }
+  $('#clipTitle').textContent = mode === 'copy' ? '글자 복사' : '글자 붙여넣기';
+  $('#clipMsg').textContent = mode === 'copy'
+    ? '브라우저가 자동 복사를 허용하지 않았습니다. 아래 글자가 골라져 있으니 Ctrl+C(맥은 Cmd+C, 휴대폰은 길게 눌러 복사)를 누른 뒤 닫으세요.'
+    : '브라우저가 클립보드 읽기를 허용하지 않았습니다. 아래 칸을 누르고 Ctrl+V(맥은 Cmd+V, 휴대폰은 길게 눌러 붙여넣기)로 붙여넣은 뒤 [넣기]를 누르세요.';
+  if (why) $('#clipMsg').textContent = why + ' ' + $('#clipMsg').textContent.replace(/^브라우저가 [^.]+\. /, '');
+  const ta = $('#clipTa'); ta.value = text || ''; ta.readOnly = mode === 'copy';
+  $('#clipOk').hidden = mode === 'copy';
+  clipCb = mode === 'paste' ? cb : null;
+  d.returnValue = ''; d.showModal(); ta.focus(); if (mode === 'copy') ta.select();
+}
+$('#dlgClip').addEventListener('close', () => { const cb = clipCb; clipCb = null; if (cb && $('#dlgClip').returnValue === 'ok') cb($('#clipTa').value); });
+// 붙여넣은 글자를 현재 쪽에 새 글자 상자로 넣는다
+function pasteText(raw) {
+  const text = cleanText(raw || '');
+  if (!text.trim()) return toast('붙여넣을 글자가 없습니다');
+  const p = currentPage(); if (!p) return toast('먼저 PDF를 여세요');
+  if (text.length > 20000) return toast('글자가 너무 많습니다 (2만 자까지). 나눠서 붙여넣으세요.', 4500);
+  const a = { id: nid('a'), type: 'text', text, size: S.style.size, color: S.style.color, pad: 0 };
+  const tb = textBox(a), c = visibleCenter(p), { w: W, h: H } = dims(p);
+  a.x = Math.max(4, Math.min(W - tb.w - 4, c.x - tb.w / 2)); a.y = Math.max(4, Math.min(H - tb.h - 4, c.y - tb.h / 2));
+  pushUndo(); p.annots.push(a); markDirty(); setTool('select'); renderAnnots(p); selectAnnot(p, a);
+  toast('붙여넣었습니다. 끌어서 옮기고, 더블클릭하면 고칠 수 있습니다 (Ctrl+Z 취소)', 3500);
+}
+function armPasteFallback() {
+  clearTimeout(pasteWait);
+  pasteWait = setTimeout(() => {
+    pasteWait = 0;
+    if (PCLIP && clipKind === 'pages') pastePages();
+    else toast('이 브라우저는 단축키 붙여넣기를 막았습니다. [글자 붙여넣기] 버튼을 누르세요.', 4500);
+  }, 300);
+}
+async function copyButton() {
+  let t = layerSelectionText();
+  if (t === '') return toast('가려진(화이트아웃·마스킹) 글자는 복사하지 않습니다');
+  if (t == null) {
+    const sel = getSelection(), ae = document.activeElement;
+    if (sel && !sel.isCollapsed && ae && (ae.isContentEditable || /^(INPUT|TEXTAREA)$/.test(ae.tagName))) t = /^(INPUT|TEXTAREA)$/.test(ae.tagName) ? ae.value.slice(ae.selectionStart, ae.selectionEnd) : sel.toString();
+    else if (hasTextSelection()) t = sel.toString();
+  }
+  if (!t) { const s = selected(); if (s && s.a.type === 'text' && s.a.text) { if (maskedAnnot(s.p, s.a)) return toast('마스킹으로 가린 글자 상자는 복사하지 않습니다'); t = s.a.text; } }
+  if (!t) return toast('복사할 글자를 먼저 고르세요. PDF 글자는 [선택] 상태에서 드래그(휴대폰은 길게 누르기)로, 글자 상자는 클릭해서 고릅니다. 스캔·사진 쪽은 글자 정보가 없어(OCR 미지원) 고를 수 없습니다.', 6500);
+  copyPlain(t, `글자 ${t.length}자를 복사했습니다`);
+}
+async function pasteButton() {
+  const ae = document.activeElement;
+  const ed = ae && ae.isContentEditable && ae.classList.contains('an-text') ? ae : null;
+  const seq = ++pasteSeq;
+  let res = { ok: false };
+  if (navigator.clipboard && navigator.clipboard.readText) {
+    const hint = setTimeout(() => { if (seq === pasteSeq) toast('클립보드를 확인하는 중입니다. 브라우저가 권한을 물으면 [허용]을 누르세요.', CLIP_WAIT_MS); }, 300);
+    try { res = await clipTimeout(navigator.clipboard.readText(), CLIP_WAIT_MS); } catch (e) { res = { ok: false, e }; }
+    clearTimeout(hint);
+    if (!res.ok) console.warn('clipboard read', res.timeout ? 'timeout' : res.e);
+  }
+  // 더 나중 붙여넣기 요청이 있으면 이 결과는 버린다 (시간이 지난 뒤 도착한 값은 어디에도 넣지 않음)
+  if (seq !== pasteSeq) return;
+  // 편집 중이던 칸이 그대로 편집 중일 때만 그 칸에 넣는다
+  const stillEditing = !!ed && ed.isConnected && ed.isContentEditable && document.activeElement === ed;
+  const text = res.ok ? res.v : null;
+  if (text == null) {
+    if (ed) {
+      if (!stillEditing) return toast('편집이 끝나 붙여넣지 않았습니다. 다시 시도하세요.', 3500);
+      return toast(res.timeout ? '클립보드 응답이 없어 멈췄습니다. 편집 중인 글자 칸에서 Ctrl+V(맥은 Cmd+V)로 붙여넣으세요.' : '브라우저가 클립보드 읽기를 막았습니다. 편집 중인 글자 칸에서 Ctrl+V(맥은 Cmd+V)로 붙여넣으세요.', 5000);
+    }
+    return openClipDialog('paste', '', pasteText, res.timeout ? '브라우저의 클립보드 응답이 없습니다(권한 확인 대기).' : '');
+  }
+  if (!text) return toast('클립보드에 글자가 없습니다');
+  if (ed) { if (stillEditing) insertPlain(ed, cleanText(text)); else toast('편집이 끝나 붙여넣지 않았습니다. 다시 시도하세요.', 3500); return; }
+  pasteText(text);
+}
+for (const id of ['#bCopyTxt', '#bPasteTxt']) $(id).addEventListener('mousedown', e => e.preventDefault()); // 편집 중인 글자 칸·고른 글자를 유지
+$('#bCopyTxt').onclick = () => copyButton();
+$('#bPasteTxt').onclick = () => pasteButton();
+// Ctrl/Cmd+C·X: 원문 층에서 고른 글자는 줄·띄어쓰기를 정리해 복사 (가려진 글자 제외)
+for (const type of ['copy', 'cut']) document.addEventListener(type, e => {
+  // 쪽 복사 표시는 같은 순간 copy 이벤트로 동기식 기록 (비동기 쓰기가 나중에 다른 복사를 덮어쓰는 경쟁 없음)
+  if (markPending != null) { if (type === 'copy' && e.clipboardData) { e.clipboardData.setData('text/plain', markPending); e.preventDefault(); pageMark = markPending; } return; }
+  const t = layerSelectionText(); if (t == null || !e.clipboardData) return;
+  e.preventDefault();
+  if (!t) { toast('가려진(화이트아웃·마스킹) 글자는 복사하지 않습니다'); return; }
+  e.clipboardData.setData('text/plain', t); clipKind = 'text';
+  toast(type === 'cut' ? 'PDF 원문은 잘라낼 수 없어 복사만 했습니다. 지우려면 [텍스트 수정]이나 [화이트아웃]을 쓰세요.' : `글자 ${t.length}자를 복사했습니다`, type === 'cut' ? 4500 : 1800);
+});
+// Ctrl/Cmd+V (입력칸 밖): 쓰던 쪽 복사면 쪽 붙여넣기, 글자면 새 글자 상자
+document.addEventListener('paste', e => {
+  const tg = e.target;
+  if (tg && tg.nodeType === 1 && (tg.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(tg.tagName))) return;
+  if (document.querySelector('dialog[open]')) return;
+  if (pasteWait) { clearTimeout(pasteWait); pasteWait = 0; }
+  const txt = e.clipboardData ? e.clipboardData.getData('text/plain') || '' : '';
+  if (PCLIP && clipKind === 'pages' && (!txt || txt === pageMark)) { e.preventDefault(); pastePages(); return; }
+  if (txt.trim()) { e.preventDefault(); pasteText(txt); return; }
+  if (PCLIP) { e.preventDefault(); pastePages(); return; }
+  toast('붙여넣을 글자가 없습니다');
+});
+// 쪽 목록·탭을 누르면 원문 글자 선택을 푼다 (Ctrl+C가 쪽 복사로 돌아가도록)
+document.addEventListener('pointerdown', e => { if (e.target.closest && e.target.closest('#thumbs,#sideList,#docTabs')) clearLayerSelection(); }, true);
 
 // properties
 $('#fSize').addEventListener('change', () => {
@@ -1418,11 +1920,11 @@ async function drawAnnots(out, page, p, map, angle, getFont, imgCache) {
       page.drawRectangle(o);
     } else if (a.type === 'text') {
       if (!a.text) continue;
-      const font = await getFont(); const col = hexRgb(a.color); const pad = a.pad || 0; const lh = a.size * LH;
+      const font = await getFont(); const col = hexRgb(a.color); const pad = a.pad || 0; const lr = lhOf(a); const lh = a.size * lr;
       if (a.border) { const tb = textBox(a); page.drawRectangle({ ...rectOf(a.x, a.y, tb.w, tb.h), borderColor: col, borderWidth: 1.5 }); }
       a.text.split('\n').forEach((ln, i) => {
         if (!ln) return;
-        const [x, y] = map(a.x + pad, a.y + pad + i * lh + baseOff() * a.size);
+        const [x, y] = map(a.x + pad, a.y + pad + i * lh + baseOffR(lr) * a.size);
         page.drawText(ln, { x, y, size: a.size, font, color: col, rotate: degrees(angle) });
       });
     } else if (a.type === 'image') {
@@ -1565,11 +2067,27 @@ document.addEventListener('keydown', e => {
     if (k === 'o') { e.preventDefault(); $('#bOpen').click(); return; }
     if (k === 'f') { e.preventDefault(); $('#q').focus(); $('#q').select(); return; }
     if (typing) return;
+    // 글자를 고른 상태면 쪽 복사 대신 글자 복사 (copy 이벤트에서 정리)
+    if ((k === 'c' || k === 'x') && hasTextSelection()) return;
+    if (k === 'c' && document.activeElement !== thumbsEl) { const s = selected(); if (s && s.a.type === 'text' && s.a.text) { e.preventDefault(); if (maskedAnnot(s.p, s.a)) { toast('마스킹으로 가린 글자 상자는 복사하지 않습니다'); return; } copyPlain(s.a.text, '고른 글자 상자의 내용을 복사했습니다'); return; } }
     if ((k === 'c' || k === 'x') && (document.activeElement === thumbsEl || S.selected.size) && !selected()) { e.preventDefault(); clipPages(k === 'x'); return; }
-    if (k === 'v' && PCLIP) { e.preventDefault(); pastePages(); return; }
+    if (k === 'v') {
+      // 쪽을 복사했고 클립보드 표시를 못 남긴 경우는 예전처럼 바로 쪽 붙여넣기, 그 밖에는 paste 이벤트에서 고른다
+      if (PCLIP && clipKind === 'pages' && !pageMark) { e.preventDefault(); pastePages(); return; }
+      armPasteFallback(); return;
+    }
     if (k === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
     if (k === 'y') { e.preventDefault(); redo(); return; }
     if (k === 'a' && document.activeElement === thumbsEl) { e.preventDefault(); S.selected = new Set(S.pages.map(p => p.id)); renderThumbs(); updateStatus(); return; }
+    if (k === 'a') {
+      // 현재 쪽의 PDF 글자를 모두 고른다
+      const host = pageEl(S.currentId)?.querySelector('.txl');
+      if (host && host.querySelector('span')) {
+        e.preventDefault(); if (S.tool !== 'select') setTool('select');
+        const r = document.createRange(); r.selectNodeContents(host); const sl = getSelection(); sl.removeAllRanges(); sl.addRange(r);
+        toast('이 쪽의 글자를 모두 골랐습니다. Ctrl+C로 복사하세요', 2500); return;
+      }
+    }
     if (k === '1') { e.preventDefault(); fitTo('w'); return; }
     if (k === '2') { e.preventDefault(); fitTo('h'); return; }
     if (k === '=' || k === '+') { e.preventDefault(); setZoom(S.zoom * 1.2); return; }
@@ -1823,7 +2341,7 @@ if ('launchQueue' in window) {
 if (!EMBED && !ANDROID && location.protocol === 'https:' && 'serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(e => console.warn(e));
 
 // ---------- 업데이트 ----------
-const APP_VERSION = '2026.11.10-0929';
+const APP_VERSION = '2026.11.13-1040';
 $('#stVer').textContent = 'v' + APP_VERSION + ' · 업데이트 확인';
 $('#verNow').textContent = 'v' + APP_VERSION;
 let lastUpdCheck = 0, updDismissed = '';
@@ -2077,6 +2595,12 @@ function clipPages(cut) {
   const ids = targetIds(); if (!ids.length) return;
   const set = new Set(ids);
   PCLIP = { pages: S.pages.filter(p => set.has(p.id)).map(p => JSON.parse(JSON.stringify(p))) };
+  // 글자 붙여넣기와 구별하려고 클립보드에 표시를 남긴다 (못 남기면 예전처럼 Ctrl+V는 쪽 붙여넣기)
+  clipKind = 'pages'; pageMark = '';
+  // execCommand('copy')가 보내는 copy 이벤트에서 바로 기록한다(권한 팝업·늦은 완료 없음). 실패하면 표시 없이 예전 동작
+  markPending = '[발해 PDF] ' + ids.length + '쪽 복사됨';
+  try { document.execCommand('copy'); } catch {}
+  markPending = null;
   if (cut) { deletePages(ids); toast(ids.length + '쪽을 잘라냈습니다. 원하는 문서(탭)에서 Ctrl+V로 붙여넣으세요.', 4000); }
   else toast(ids.length + '쪽을 복사했습니다. 원하는 문서(탭)에서 Ctrl+V로 붙여넣으세요.', 4000);
 }
